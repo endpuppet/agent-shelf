@@ -14,14 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Run static verification
-        run: node tests/verify.mjs
       - name: Run canonical item schema tests
         run: node tests/item-schema.mjs
-      - name: Run catalog builder tests
-        run: node tests/catalog-builder.mjs
-      - name: Generate catalog from canonical metadata
-        run: node tools/generate-catalog.mjs
       - name: Run skill integrity tests
         run: node tests/skill-integrity.mjs
       - name: Run importer tests
@@ -30,3 +24,9 @@ jobs:
         run: node tests/verify-imported-skills.mjs
       - name: Verify imported skills against pinned upstream bytes
         run: node tools/verify-imported-skills.mjs
+      - name: Run catalog builder tests
+        run: node tests/catalog-builder.mjs
+      - name: Generate catalog from canonical metadata
+        run: node tools/generate-catalog.mjs
+      - name: Run static verification against generated catalog
+        run: node tests/verify.mjs
