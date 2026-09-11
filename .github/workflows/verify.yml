@@ -18,6 +18,8 @@ jobs:
         run: node tests/verify.mjs
       - name: Run canonical item schema tests
         run: node tests/item-schema.mjs
+      - name: Run catalog builder tests
+        run: node tests/catalog-builder.mjs
       - name: Run skill integrity tests
         run: node tests/skill-integrity.mjs
       - name: Run importer tests
