@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { validateItem, deriveTrustCode, contentFilename, isSafeRelativePath } from '../lib/item-schema.mjs';
 
 const SHA40 = '0123456789abcdef0123456789abcdef01234567';
@@ -114,5 +117,21 @@ assert.throws(() => validateItem(upstream, { expectedSlug: 'other' }), /slug/i);
 assert.throws(() => validateItem({ ...upstream, tags: 'svg' }), /tags/i);
 assert.throws(() => validateItem({ ...upstream, integrity: { ...upstream.integrity, sha256: 'ABC' } }), /sha-256|sha256/i);
 assert.throws(() => validateItem({ ...upstream, integrity: { ...upstream.integrity, bytes: -1 } }), /byte/i);
+
+const promptItems = [
+  ['research', 'research-max'],
+  ['web-prototypes', 'svg-world'],
+  ['web-prototypes', 'critter-prototype'],
+  ['visual-assets', 'scene-decomposition']
+];
+for (const [category, slug] of promptItems) {
+  const dir = path.join('prompts', category, slug);
+  const item = JSON.parse(fs.readFileSync(path.join(dir, 'item.json'), 'utf8'));
+  validateItem(item, { expectedType: 'prompt', expectedCategory: category, expectedSlug: slug });
+  const bytes = fs.readFileSync(path.join(dir, 'PROMPT.md'));
+  assert.equal(item.integrity.bytes, bytes.length, `${slug} byte count must match PROMPT.md`);
+  assert.equal(item.integrity.sha256, createHash('sha256').update(bytes).digest('hex'), `${slug} hash must match PROMPT.md`);
+  assert.equal(deriveTrustCode(item), 'derived');
+}
 
 console.log('Canonical item schema tests passed.');
