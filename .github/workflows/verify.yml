@@ -16,6 +16,8 @@ jobs:
         uses: actions/checkout@v6
       - name: Run static verification
         run: node tests/verify.mjs
+      - name: Run canonical item schema tests
+        run: node tests/item-schema.mjs
       - name: Run skill integrity tests
         run: node tests/skill-integrity.mjs
       - name: Run importer tests
