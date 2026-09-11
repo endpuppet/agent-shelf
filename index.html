@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="shelf-lime">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0c0e0d" />
+  <meta name="theme-color" content="#0b0d0c" />
   <meta name="description" content="Agent Shelf — a compact visual browser for reusable agent skills and prompts." />
   <title>Agent Shelf</title>
   <link rel="stylesheet" href="./styles.css" />
@@ -18,18 +18,24 @@
   <header class="topbar">
     <a class="brand" href="#/skills" aria-label="Agent Shelf home">
       <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-      <span class="brand-copy"><strong>agent shelf</strong><small>skills + prompts</small></span>
+      <span class="brand-copy"><strong>agent shelf</strong><small data-i18n="brand_subtitle">skills + prompts</small></span>
     </a>
-    <a class="icon-button" href="https://github.com/endpuppet/agent-shelf" target="_blank" rel="noreferrer" aria-label="Open repository on GitHub" title="Open repository">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.71.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.46-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.9 1.56 2.35 1.11 2.92.85.09-.66.35-1.11.64-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.69a9.3 9.3 0 0 1 2.5.35c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"/></svg>
-    </a>
+    <div class="top-actions">
+      <button id="language-toggle" class="compact-button language-toggle" type="button" aria-label="Switch language" title="Switch language"><span class="language-current">EN</span><span class="language-divider">/</span><span class="language-other">SL</span></button>
+      <button id="theme-toggle" class="icon-button" type="button" aria-label="Choose theme" title="Choose theme">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 0-3.6h-.6a1.8 1.8 0 0 1 0-3.6H15A6 6 0 0 0 21 7.8C21 5.15 17 3 12 3Z"/><circle cx="7.5" cy="9" r=".8"/><circle cx="10" cy="6.5" r=".8"/><circle cx="14" cy="6.5" r=".8"/><circle cx="16.5" cy="9" r=".8"/></svg>
+      </button>
+      <a class="icon-button github-button" href="https://github.com/endpuppet/agent-shelf" target="_blank" rel="noreferrer" aria-label="Open repository on GitHub" title="Open repository">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.23c0 4.52 2.87 8.35 6.84 9.71.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.46-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.9 1.56 2.35 1.11 2.92.85.09-.66.35-1.11.64-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.69a9.3 9.3 0 0 1 2.5.35c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.23C22 6.58 17.52 2 12 2Z"/></svg>
+      </a>
+    </div>
   </header>
 
   <main class="app-shell">
     <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-kicker"><span class="status-dot"></span> public registry</div>
-      <h1 id="hero-title">Useful agent material,<br><span>without the folder spelunking.</span></h1>
-      <p>Browse reusable skills and prompts by use case. Open the source, copy the full content, or share a direct shelf link.</p>
+      <div class="hero-kicker"><span class="status-dot"></span><span data-i18n="hero_kicker">public registry</span></div>
+      <h1 id="hero-title"><span data-i18n="hero_title_1">Useful agent material,</span><br><span class="hero-muted" data-i18n="hero_title_2">without the folder spelunking.</span></h1>
+      <p data-i18n="hero_body">Browse reusable skills and prompts by use case. Open the source, copy the full content, or share a direct shelf link.</p>
     </section>
 
     <section class="controls" aria-label="Catalog controls">
@@ -40,8 +46,8 @@
       </div>
 
       <div class="type-switch" role="tablist" aria-label="Content type">
-        <button class="type-tab is-active" data-type="skill" role="tab" aria-selected="true"><span>Skills</span><b id="skill-count">0</b></button>
-        <button class="type-tab" data-type="prompt" role="tab" aria-selected="false"><span>Prompts</span><b id="prompt-count">0</b></button>
+        <button class="type-tab is-active" data-type="skill" role="tab" aria-selected="true"><span data-i18n="skills">Skills</span><b id="skill-count">0</b></button>
+        <button class="type-tab" data-type="prompt" role="tab" aria-selected="false"><span data-i18n="prompts">Prompts</span><b id="prompt-count">0</b></button>
       </div>
       <div id="categories" class="category-row" aria-label="Categories"></div>
     </section>
@@ -53,8 +59,8 @@
       </div>
       <div id="catalog" class="catalog-grid" aria-live="polite"></div>
       <div id="empty-state" class="empty-state" hidden>
-        <div class="empty-glyph">⌁</div><h3>No shelf match.</h3><p>Try another word or clear the category filter.</p>
-        <button id="clear-filters" class="button secondary">Clear filters</button>
+        <div class="empty-glyph">⌁</div><h3 data-i18n="empty_title">No shelf match.</h3><p data-i18n="empty_body">Try another word or clear the category filter.</p>
+        <button id="clear-filters" class="button secondary" type="button" data-i18n="clear_filters">Clear filters</button>
       </div>
     </section>
   </main>
@@ -63,26 +69,27 @@
     <div class="detail-backdrop" data-close-detail></div>
     <article class="detail-sheet">
       <div class="detail-topbar">
-        <button class="icon-button" data-close-detail aria-label="Close detail" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+        <button class="icon-button" data-close-detail type="button" aria-label="Close detail" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
         <div class="detail-path" id="detail-path">skills / …</div>
         <a id="detail-github-top" class="icon-button" href="#" target="_blank" rel="noreferrer" aria-label="Open source on GitHub" title="Open source"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5m0-5-9 9M19 13v6H5V5h6"/></svg></a>
       </div>
 
       <div class="detail-scroll">
         <header class="detail-header">
-          <div id="detail-kind" class="detail-kind">skill</div><h2 id="detail-title">Item title</h2><p id="detail-description"></p><div id="detail-tags" class="tag-row"></div>
+          <div class="detail-meta-line"><div id="detail-kind" class="detail-kind">skill</div><span class="source-language" data-i18n="source_english">source: EN</span></div>
+          <h2 id="detail-title">Item title</h2><p id="detail-description"></p><div id="detail-tags" class="tag-row"></div>
         </header>
 
         <div class="action-grid">
-          <button id="copy-content" class="button primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8zM5 16H4V4h12v1"/></svg>Copy content</button>
-          <button id="copy-app-link" class="button secondary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07.07l2-2A5 5 0 0 0 12 4l-1.15 1.15M14 11a5 5 0 0 0-7.07-.07l-2 2A5 5 0 0 0 12 20l1.15-1.15"/></svg>Copy shelf link</button>
-          <button id="copy-source-link" class="button secondary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07.07l2-2A5 5 0 0 0 12 4l-1.15 1.15M14 11a5 5 0 0 0-7.07-.07l-2 2A5 5 0 0 0 12 20l1.15-1.15"/></svg>Copy source link</button>
-          <a id="open-github" class="button secondary" href="#" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5m0-5-9 9M19 13v6H5V5h6"/></svg>Open on GitHub</a>
+          <button id="copy-content" class="button primary" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8zM5 16H4V4h12v1"/></svg><span data-i18n="copy_content">Copy content</span></button>
+          <button id="copy-app-link" class="button secondary" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07.07l2-2A5 5 0 0 0 12 4l-1.15 1.15M14 11a5 5 0 0 0-7.07-.07l-2 2A5 5 0 0 0 12 20l1.15-1.15"/></svg><span data-i18n="copy_shelf_link">Copy shelf link</span></button>
+          <button id="copy-source-link" class="button secondary" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07.07l2-2A5 5 0 0 0 12 4l-1.15 1.15M14 11a5 5 0 0 0-7.07-.07l-2 2A5 5 0 0 0 12 20l1.15-1.15"/></svg><span data-i18n="copy_source_link">Copy source link</span></button>
+          <a id="open-github" class="button secondary" href="#" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5m0-5-9 9M19 13v6H5V5h6"/></svg><span data-i18n="open_github">Open on GitHub</span></a>
         </div>
 
         <div class="content-tabs" role="tablist" aria-label="Content view">
-          <button class="content-tab is-active" data-view="preview" aria-selected="true">Preview</button>
-          <button class="content-tab" data-view="raw" aria-selected="false">Raw</button>
+          <button class="content-tab is-active" data-view="preview" type="button" aria-selected="true" data-i18n="preview">Preview</button>
+          <button class="content-tab" data-view="raw" type="button" aria-selected="false" data-i18n="raw">Raw</button>
         </div>
         <div id="content-loading" class="content-loading"><span></span><span></span><span></span></div>
         <div id="markdown-preview" class="markdown-body" hidden></div>
@@ -90,6 +97,20 @@
       </div>
     </article>
   </aside>
+
+  <aside id="theme-panel" class="theme-panel" aria-hidden="true" aria-label="Theme chooser">
+    <div class="theme-backdrop" data-close-theme></div>
+    <section class="theme-sheet" role="dialog" aria-modal="true" aria-labelledby="theme-title">
+      <div class="theme-sheet-head"><div><p data-i18n="appearance">Appearance</p><h2 id="theme-title" data-i18n="choose_theme">Choose a theme</h2></div><button class="icon-button" type="button" data-close-theme aria-label="Close theme chooser"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg></button></div>
+      <div class="theme-grid">
+        <button class="theme-card" type="button" data-theme-choice="shelf-lime"><span class="theme-swatch swatch-lime"></span><span><strong>Shelf Lime</strong><small data-i18n="theme_lime">Dark, sharp, electric</small></span><i aria-hidden="true">✓</i></button>
+        <button class="theme-card" type="button" data-theme-choice="paper-vermilion"><span class="theme-swatch swatch-paper"></span><span><strong>Paper Vermilion</strong><small data-i18n="theme_paper">Warm paper, red ink</small></span><i aria-hidden="true">✓</i></button>
+        <button class="theme-card" type="button" data-theme-choice="midnight-cobalt"><span class="theme-swatch swatch-cobalt"></span><span><strong>Midnight Cobalt</strong><small data-i18n="theme_cobalt">Cool technical blue</small></span><i aria-hidden="true">✓</i></button>
+        <button class="theme-card" type="button" data-theme-choice="mono-brutal"><span class="theme-swatch swatch-mono"></span><span><strong>Mono Brutal</strong><small data-i18n="theme_mono">Hard black and white</small></span><i aria-hidden="true">✓</i></button>
+      </div>
+    </section>
+  </aside>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
