@@ -64,6 +64,11 @@ export async function verifyImportedSkills({rootDir = process.cwd(), fetchImpl =
       const item = matches[0];
       if (item.path !== relSkill) throw new Error(`${relSkill}: catalog path mismatch (${item.path}).`);
       if (item.verification !== 'exact-upstream') throw new Error(`${relSkill}: catalog verification must be exact-upstream.`);
+      const provenanceMatches = item.source_repository === metadata.source.repository
+        && item.source_path === metadata.source.path
+        && item.source_commit === metadata.source.commit
+        && item.sha256 === metadata.integrity.sha256;
+      if (!provenanceMatches) throw new Error(`${relSkill}: catalog provenance mismatch with agent-shelf.json.`);
     }
     metadataBySkillPath.set(relSkill, metadata);
   }

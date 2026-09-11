@@ -47,7 +47,8 @@ await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot(), fetchImpl:f
 const goodCatalog = {
   id:'skill-frontend-exact-skill', type:'skill', category:'frontend', slug:'exact-skill',
   title:'Exact Skill', title_sl:'Točna veščina', description:'Exact', description_sl:'Točno', tags:[], tags_sl:[],
-  path:'skills/frontend/exact-skill/SKILL.md', verification:'exact-upstream'
+  path:'skills/frontend/exact-skill/SKILL.md', verification:'exact-upstream',
+  source_repository:'owner/repo', source_path:'SKILL.md', source_commit:COMMIT, sha256:sha256(original)
 };
 await assert.rejects(() => verifyImportedSkills({
   rootDir:makeRoot({catalogItems:[{...goodCatalog, path:'skills/frontend/exact-skill/OTHER.md'}]}),
@@ -57,6 +58,11 @@ await assert.rejects(() => verifyImportedSkills({
   rootDir:makeRoot({catalogItems:[{...goodCatalog, verification:'something-else'}]}),
   fetchImpl:fetchBytes(original)
 }), /exact-upstream/i);
+
+await assert.rejects(() => verifyImportedSkills({
+  rootDir:makeRoot({catalogItems:[{...goodCatalog, source_commit:'f'.repeat(40)}]}),
+  fetchImpl:fetchBytes(original)
+}), /provenance mismatch/i);
 
 assert.equal(await verifyImportedSkills({rootDir:makeRoot({catalogItems:[goodCatalog]}), fetchImpl:fetchBytes(original), log:()=>{}}), 1);
 

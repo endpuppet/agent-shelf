@@ -10,6 +10,8 @@ const app = read('app.js');
 const html = read('index.html');
 const css = read('styles.css');
 const catalog = JSON.parse(read('catalog.json'));
+const provenanceJs = read('verified-provenance.js');
+const provenanceCss = read('verified-provenance.css');
 
 
 const skillEntries = catalog.items.filter((item) => item.type === 'skill');
@@ -33,6 +35,16 @@ assert.ok(gateIndex >= 0 && uploadIndex >= 0 && gateIndex < uploadIndex, 'Pages 
 
 assert.match(app, /raw\.githubusercontent\.com/, 'Markdown loader needs a raw.githubusercontent.com fallback.');
 assert.match(app, /localStorage/, 'Theme and language choices should persist locally.');
+assert.match(provenanceJs, /EXACT UPSTREAM/, 'Verified skill details must expose the EXACT UPSTREAM trust label.');
+assert.match(provenanceJs, /function pinnedSourceUrl\(/, 'Verified skills need a commit-pinned upstream source URL constructor.');
+assert.match(provenanceJs, /id=\"verification-badge\"/, 'Verified skill details need a trust badge element.');
+assert.match(provenanceJs, /id=\"provenance-repository\"/, 'Verified skill details need repository provenance.');
+assert.match(provenanceJs, /id=\"provenance-commit\"/, 'Verified skill details need commit provenance.');
+assert.match(provenanceJs, /id=\"provenance-hash\"/, 'Verified skill details need hash provenance.');
+assert.match(html, /verified-provenance\.js/, 'The provenance module must load in the shelf UI.');
+assert.match(html, /verified-provenance\.css/, 'The provenance styles must load in the shelf UI.');
+assert.match(provenanceCss, /\.verification-badge/, 'Verified provenance needs visible trust styling.');
+
 assert.match(html, /id="language-toggle"/, 'UI needs an EN/SL language control.');
 assert.match(html, /id="theme-toggle"/, 'UI needs a theme control.');
 
@@ -51,7 +63,19 @@ assert.doesNotMatch(app, /document\.body\.style\.overflow/, 'Body overflow must 
 assert.match(css, /\.detail-scroll\{[^}]*-webkit-overflow-scrolling:touch[^}]*touch-action:pan-y/, 'Detail content needs reliable native vertical touch scrolling.');
 assert.match(css, /\.detail-backdrop\{[^}]*touch-action:none/, 'Backdrop gestures should not leak into the page underneath.');
 
-for (const theme of ['shelf-lime', 'paper-vermilion', 'midnight-cobalt', 'mono-brutal']) {
+
+const agents = read('AGENTS.md');
+for (const required of [
+  'NEVER author or modify an imported SKILL.md',
+  'byte-for-byte',
+  'full 40-character commit SHA',
+  'node tools/import-skill.mjs',
+  'node tools/verify-imported-skills.mjs'
+]) {
+  assert.ok(agents.includes(required), `AGENTS.md is missing immutable skill policy: ${required}`);
+}
+
+for (const theme of ['shelf-lime', 'paper-vermilion','midnight-cobalt','mono-brutal']) {
   assert.ok(css.includes(`[data-theme="${theme}"]`), `Missing theme: ${theme}`);
 }
 
