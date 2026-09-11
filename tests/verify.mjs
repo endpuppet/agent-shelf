@@ -11,6 +11,9 @@ const app = read('app.js');
 const html = read('index.html');
 const css = read('styles.css');
 const catalog = buildCatalog({ rootDir: '.' });
+assert.doesNotThrow(() => new Function(app), 'app.js must remain syntactically valid JavaScript.');
+assert.ok(exists('catalog.json'), 'Static verification must run after catalog.json generation.');
+assert.deepEqual(JSON.parse(read('catalog.json')), catalog, 'Published catalog.json must be the deterministic projection of canonical item metadata.');
 
 const skillEntries = catalog.items.filter((item) => item.type === 'skill');
 const skillFiles = exists('skills')
@@ -34,11 +37,36 @@ const pagesWorkflow = read('.github/workflows/pages.yml');
 assert.ok(exists('.gitattributes'), '.gitattributes must protect imported skill bytes.');
 const gitAttributes = exists('.gitattributes') ? read('.gitattributes') : '';
 assert.match(gitAttributes, /^skills\/\*\*\/SKILL\.md -text$/m, 'Imported SKILL.md files must be marked -text.');
-assert.match(verifyWorkflow, /node tools\/verify-imported-skills\.mjs/, 'Verification workflow must run imported-skill verification.');
-assert.match(pagesWorkflow, /node tools\/verify-imported-skills\.mjs/, 'Pages workflow must run imported-skill verification.');
-const gateIndex = pagesWorkflow.indexOf('node tools/verify-imported-skills.mjs');
+
+for (const [name, workflow] of [['Verification', verifyWorkflow], ['Pages', pagesWorkflow]]) {
+  assert.match(workflow, /node tools\/verify-imported-skills\.mjs/, `${name} workflow must run imported-skill verification.`);
+  assert.match(workflow, /node tools\/generate-catalog\.mjs/, `${name} workflow must generate catalog from canonical metadata.`);
+  assert.match(workflow, /node tests\/verify\.mjs/, `${name} workflow must run static verification against generated output.`);
+}
+
+const verifyGateIndex = verifyWorkflow.indexOf('node tools/verify-imported-skills.mjs');
+const verifyCatalogTestIndex = verifyWorkflow.indexOf('node tests/catalog-builder.mjs');
+const verifyGenerateIndex = verifyWorkflow.indexOf('node tools/generate-catalog.mjs');
+const verifyStaticIndex = verifyWorkflow.indexOf('node tests/verify.mjs');
+assert.ok(
+  verifyGateIndex >= 0
+  && verifyCatalogTestIndex > verifyGateIndex
+  && verifyGenerateIndex > verifyCatalogTestIndex
+  && verifyStaticIndex > verifyGenerateIndex,
+  'Verification workflow must verify upstream, test catalog building, generate catalog, then run static verification.'
+);
+
+const pagesGateIndex = pagesWorkflow.indexOf('node tools/verify-imported-skills.mjs');
+const pagesGenerateIndex = pagesWorkflow.indexOf('node tools/generate-catalog.mjs');
+const pagesStaticIndex = pagesWorkflow.indexOf('node tests/verify.mjs');
 const uploadIndex = pagesWorkflow.indexOf('actions/upload-pages-artifact');
-assert.ok(gateIndex >= 0 && uploadIndex >= 0 && gateIndex < uploadIndex, 'Pages integrity gate must run before artifact upload.');
+assert.ok(
+  pagesGateIndex >= 0
+  && pagesGenerateIndex > pagesGateIndex
+  && pagesStaticIndex > pagesGenerateIndex
+  && uploadIndex > pagesStaticIndex,
+  'Pages must verify exact-upstream skills, generate catalog, run static verification, then upload the artifact.'
+);
 
 assert.match(app, /raw\.githubusercontent\.com/, 'Markdown loader needs a raw.githubusercontent.com fallback.');
 assert.match(app, /localStorage/, 'Theme and language choices should persist locally.');
