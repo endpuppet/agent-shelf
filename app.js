@@ -114,10 +114,9 @@ const el = {
   raw: document.querySelector('#raw-content'),
   toast: document.querySelector('#toast'),
   languageToggle: document.querySelector('#language-toggle'),
-  languageCurrent: document.querySelector('.language-current'),
-  languageOther: document.querySelector('.language-other'),
+  languageBadge: document.querySelector('.language-badge'),
+  detailScroll: document.querySelector('.detail-scroll'),
   themeToggle: document.querySelector('#theme-toggle'),
-  themePanel: document.querySelector('#theme-panel'),
   themeColor: document.querySelector('meta[name="theme-color"]')
 };
 
@@ -333,11 +332,6 @@ function renderDetailMeta() {
   el.detailTags.innerHTML = itemTags(item).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
 }
 
-function syncBodyLock() {
-  const locked = el.detail.classList.contains('is-open') || el.themePanel.classList.contains('is-open');
-  document.body.style.overflow = locked ? 'hidden' : '';
-}
-
 function openItem(item, {updateHash = true} = {}) {
   if (!item) return;
   state.selected = item;
@@ -349,7 +343,7 @@ function openItem(item, {updateHash = true} = {}) {
   el.openGithub.href = source;
   el.detail.classList.add('is-open');
   el.detail.setAttribute('aria-hidden', 'false');
-  syncBodyLock();
+  el.detailScroll.scrollTop = 0;
   if (updateHash) history.pushState(null, '', routeFor(item));
   loadContent(item);
 }
@@ -359,7 +353,6 @@ function closeDetail({updateHash = true} = {}) {
   state.content = '';
   el.detail.classList.remove('is-open');
   el.detail.setAttribute('aria-hidden', 'true');
-  syncBodyLock();
   if (updateHash) history.pushState(null, '', `#/${state.type}s`);
 }
 
@@ -373,7 +366,10 @@ function setTypeTabs() {
 
 function applyHash() {
   const parts = location.hash.replace(/^#\//, '').split('/').filter(Boolean);
-  if (!parts.length) return;
+  if (!parts.length) {
+    if (state.selected) closeDetail({updateHash: false});
+    return;
+  }
   state.type = parts[0] === 'prompts' ? 'prompt' : 'skill';
   setTypeTabs();
   state.category = 'all';
@@ -397,18 +393,11 @@ function applyTheme(theme, {notify = false} = {}) {
   if (notify) toast(t('theme_changed'));
 }
 
-function openThemePanel() {
-  el.themePanel.classList.add('is-open');
-  el.themePanel.setAttribute('aria-hidden', 'false');
-  syncBodyLock();
+function cycleTheme() {
+  const currentIndex = THEMES.indexOf(state.theme);
+  const nextTheme = THEMES[(currentIndex + 1) % THEMES.length];
+  applyTheme(nextTheme, {notify: true});
 }
-
-function closeThemePanel() {
-  el.themePanel.classList.remove('is-open');
-  el.themePanel.setAttribute('aria-hidden', 'true');
-  syncBodyLock();
-}
-
 function applyLanguage({notify = false} = {}) {
   document.documentElement.lang = state.language;
   localStorage.setItem(STORAGE.language, state.language);
@@ -416,8 +405,7 @@ function applyLanguage({notify = false} = {}) {
     node.textContent = t(node.dataset.i18n);
   });
   el.search.placeholder = t('search_placeholder');
-  el.languageCurrent.textContent = state.language.toUpperCase();
-  el.languageOther.textContent = state.language === 'en' ? 'SL' : 'EN';
+  el.languageBadge.textContent = state.language.toUpperCase();
   el.languageToggle.setAttribute('aria-label', t('switch_language'));
   el.languageToggle.title = t('switch_language');
   el.themeToggle.setAttribute('aria-label', t('choose_theme_label'));
@@ -480,21 +468,11 @@ el.languageToggle.addEventListener('click', () => {
   applyLanguage({notify: true});
 });
 
-el.themeToggle.addEventListener('click', openThemePanel);
-document.querySelectorAll('[data-close-theme]').forEach((node) => node.addEventListener('click', closeThemePanel));
-document.querySelectorAll('[data-theme-choice]').forEach((button) => {
-  button.addEventListener('click', () => {
-    applyTheme(button.dataset.themeChoice, {notify: true});
-    closeThemePanel();
-  });
-});
+el.themeToggle.addEventListener('click', cycleTheme);
 
 window.addEventListener('hashchange', applyHash);
 window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
-    if (el.themePanel.classList.contains('is-open')) closeThemePanel();
-    else if (state.selected) closeDetail();
-  }
+  if (event.key === 'Escape' && state.selected) closeDetail();
   if (event.key === '/' && !state.selected && document.activeElement?.tagName !== 'INPUT') {
     event.preventDefault();
     el.search.focus();

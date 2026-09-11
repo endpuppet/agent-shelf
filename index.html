@@ -21,7 +21,10 @@
       <span class="brand-copy"><strong>agent shelf</strong><small data-i18n="brand_subtitle">skills + prompts</small></span>
     </a>
     <div class="top-actions">
-      <button id="language-toggle" class="compact-button language-toggle" type="button" aria-label="Switch language" title="Switch language"><span class="language-current">EN</span><span class="language-divider">/</span><span class="language-other">SL</span></button>
+      <button id="language-toggle" class="icon-button language-toggle" type="button" aria-label="Switch language" title="Switch language">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h10M9 3v2m1.5 0c-.6 3.5-2.6 6.4-5.5 8.5m3-5c1.2 1.8 2.7 3.3 4.5 4.4M15 19l3.5-9 3.5 9m-5.7-3h4.4"/></svg>
+        <span class="language-badge">EN</span>
+      </button>
       <button id="theme-toggle" class="icon-button" type="button" aria-label="Choose theme" title="Choose theme">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 0-3.6h-.6a1.8 1.8 0 0 1 0-3.6H15A6 6 0 0 0 21 7.8C21 5.15 17 3 12 3Z"/><circle cx="7.5" cy="9" r=".8"/><circle cx="10" cy="6.5" r=".8"/><circle cx="14" cy="6.5" r=".8"/><circle cx="16.5" cy="9" r=".8"/></svg>
       </button>
@@ -96,19 +99,6 @@
         <pre id="raw-content" class="raw-content" hidden><code></code></pre>
       </div>
     </article>
-  </aside>
-
-  <aside id="theme-panel" class="theme-panel" aria-hidden="true" aria-label="Theme chooser">
-    <div class="theme-backdrop" data-close-theme></div>
-    <section class="theme-sheet" role="dialog" aria-modal="true" aria-labelledby="theme-title">
-      <div class="theme-sheet-head"><div><p data-i18n="appearance">Appearance</p><h2 id="theme-title" data-i18n="choose_theme">Choose a theme</h2></div><button class="icon-button" type="button" data-close-theme aria-label="Close theme chooser"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg></button></div>
-      <div class="theme-grid">
-        <button class="theme-card" type="button" data-theme-choice="shelf-lime"><span class="theme-swatch swatch-lime"></span><span><strong>Shelf Lime</strong><small data-i18n="theme_lime">Dark, sharp, electric</small></span><i aria-hidden="true">✓</i></button>
-        <button class="theme-card" type="button" data-theme-choice="paper-vermilion"><span class="theme-swatch swatch-paper"></span><span><strong>Paper Vermilion</strong><small data-i18n="theme_paper">Warm paper, red ink</small></span><i aria-hidden="true">✓</i></button>
-        <button class="theme-card" type="button" data-theme-choice="midnight-cobalt"><span class="theme-swatch swatch-cobalt"></span><span><strong>Midnight Cobalt</strong><small data-i18n="theme_cobalt">Cool technical blue</small></span><i aria-hidden="true">✓</i></button>
-        <button class="theme-card" type="button" data-theme-choice="mono-brutal"><span class="theme-swatch swatch-mono"></span><span><strong>Mono Brutal</strong><small data-i18n="theme_mono">Hard black and white</small></span><i aria-hidden="true">✓</i></button>
-      </div>
-    </section>
   </aside>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
