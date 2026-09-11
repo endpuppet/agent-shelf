@@ -29,6 +29,10 @@ jobs:
           enablement: true
       - name: Verify imported skills against pinned upstream bytes
         run: node tools/verify-imported-skills.mjs
+      - name: Generate catalog from canonical metadata
+        run: node tools/generate-catalog.mjs
+      - name: Run static verification against generated catalog
+        run: node tests/verify.mjs
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
