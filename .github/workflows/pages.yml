@@ -27,6 +27,8 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Verify imported skills against pinned upstream bytes
+        run: node tools/verify-imported-skills.mjs
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
@@ -34,19 +36,19 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
-      - name: Smoke test published Markdown
+      - name: Smoke test published catalog
         shell: bash
         run: |
           base="${{ steps.deployment.outputs.page_url }}"
-          url="${base%/}/skills/svg-vector/svg-authoring/SKILL.md"
+          url="${base%/}/catalog.json"
           echo "Checking $url"
           for attempt in {1..12}; do
-            if body="$(curl --fail --silent --show-error --location --max-time 15 "$url")" && grep -q '^# SVG Authoring' <<<"$body"; then
-              echo "Published Markdown is reachable and intact."
+            if body="$(curl --fail --silent --show-error --location --max-time 15 "$url")" && grep -q '"items"' <<<"$body"; then
+              echo "Published Agent Shelf catalog is reachable."
               exit 0
             fi
             echo "Attempt $attempt failed; waiting for Pages propagation..."
             sleep 5
           done
-          echo "Published Markdown smoke test failed."
+          echo "Published catalog smoke test failed."
           exit 1
