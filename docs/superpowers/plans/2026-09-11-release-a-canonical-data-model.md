@@ -4,89 +4,53 @@
 
 **Goal:** Replace Agent Shelf's manually maintained catalog and legacy `agent-shelf.json` metadata with canonical per-item `item.json` files, deterministic catalog generation, chrome-only translation, and an exact-upstream verifier that preserves every existing byte-integrity guarantee.
 
-**Architecture:** Canonical item folders contain the immutable/editable content file plus `item.json`. Shared validation reads that canonical metadata; the exact-upstream verifier reads the same source of truth and performs network-backed byte comparison; the catalog generator projects validated filesystem state into `catalog.json` for the static WebUI. `catalog.json` is generated during local/CI/Pages workflows and is not an authority.
+**Architecture:** Each item folder contains its content file plus canonical `item.json`. Shared validation reads that metadata; exact-upstream verification reads the same source of truth and independently fetches commit-pinned bytes; catalog generation projects validated filesystem state into `catalog.json` for the static WebUI. Generated catalog data never grants trust back to canonical content.
 
-**Tech Stack:** Node.js ESM, built-in `fs`, `path`, `crypto`, native `fetch`, static HTML/CSS/vanilla JS, GitHub Actions, GitHub Pages.
+**Tech Stack:** Node.js ESM, built-in `fs`, `path`, `crypto`, native `fetch`, vanilla JS/CSS/HTML, GitHub Actions, GitHub Pages.
 
 **Spec:** `docs/superpowers/specs/2026-09-11-release-a-canonical-data-model-design.md`
 
 ## Global Constraints
 
 - `main` remains the trusted published state.
-- `skills/**/SKILL.md` exact-upstream files remain byte-for-byte identical to a public GitHub source file pinned to a full 40-character commit SHA.
-- Never normalize, translate, rewrite, re-encode, or decorate exact-upstream `SKILL.md` bytes.
-- Keep `.gitattributes` rule `skills/**/SKILL.md -text` unchanged.
+- Exact-upstream `SKILL.md` files remain byte-for-byte identical to a public GitHub source file at a full 40-character commit SHA.
+- Never normalize, translate, rewrite, re-encode, or decorate exact-upstream skill bytes.
+- Keep `skills/**/SKILL.md -text` in `.gitattributes` unchanged.
 - `EXACT UPSTREAM` is derived trust state, never an author-written metadata flag.
 - Only WebUI chrome is translated between English and Slovenian.
-- Item titles, descriptions, tags, source content, repository names, authors, and provenance values are language invariant.
-- Deleting an item folder must remove it from the next generated catalog.
-- The exact-upstream network verifier must run before `actions/upload-pages-artifact`.
-- A repository with zero imported skills must remain valid.
-- Do not implement Release B mutation/PR utilities, Release C friendly URL resolution, upstream update tracking, private content, or browser writes in this release.
+- Item titles, descriptions, tags, content, repository names, authors, and provenance values are language invariant.
+- Deleting an item folder removes it from the next generated catalog.
+- The network-backed exact-upstream verifier must run before `actions/upload-pages-artifact`.
+- Zero imported skills remains a valid repository state.
+- Release B–F features remain out of scope.
+
+## File Map
+
+**Create:** `lib/item-schema.mjs`, `lib/catalog-builder.mjs`, `tools/generate-catalog.mjs`, `tests/item-schema.mjs`, `tests/catalog-builder.mjs`, four prompt `item.json` files.
+
+**Modify:** `lib/skill-integrity.mjs`, `tools/import-skill.mjs`, `tools/verify-imported-skills.mjs`, the three existing integrity/import tests, `tests/verify.mjs`, `app.js`, `index.html`, `styles.css`, both GitHub Actions workflows, `AGENTS.md`, `README.md`, `FUTURE_RELEASES.md`.
+
+**Remove after migration:** tracked manual `catalog.json`, `verified-provenance.js`, `verified-provenance.css`, and all live assumptions that verified skills use `agent-shelf.json`.
 
 ---
 
-## Planned File Structure
-
-### New files
-
-- `lib/item-schema.mjs` — canonical item schema validation, filesystem agreement checks, origin/integrity compatibility, trust-code derivation.
-- `lib/catalog-builder.mjs` — filesystem scan, local content verification, deterministic catalog projection.
-- `tools/generate-catalog.mjs` — CLI wrapper that writes generated `catalog.json`.
-- `tests/item-schema.mjs` — schema/provenance contract tests.
-- `tests/catalog-builder.mjs` — deterministic generation, duplicate detection, deletion semantics, local hash validation.
-- `prompts/research/research-max/item.json`
-- `prompts/web-prototypes/svg-world/item.json`
-- `prompts/web-prototypes/critter-prototype/item.json`
-- `prompts/visual-assets/scene-decomposition/item.json`
-
-### Modified files
-
-- `lib/skill-integrity.mjs` — keep binary helpers; consume canonical item provenance shape.
-- `tools/import-skill.mjs` — write `item.json` instead of `agent-shelf.json`; keep exact byte write behavior.
-- `tools/verify-imported-skills.mjs` — scan canonical `item.json`, reject orphan skills, stop trusting catalog input.
-- `tests/skill-integrity.mjs`
-- `tests/import-skill.mjs`
-- `tests/verify-imported-skills.mjs`
-- `tests/verify.mjs`
-- `app.js`
-- `index.html`
-- `styles.css`
-- `.github/workflows/verify.yml`
-- `.github/workflows/pages.yml`
-- `AGENTS.md`
-- `README.md`
-- `FUTURE_RELEASES.md`
-
-### Removed files after migration
-
-- `catalog.json` as a hand-maintained tracked source artifact.
-- `verified-provenance.js` after its behavior is folded into `app.js`.
-- `verified-provenance.css` after its styles are folded into `styles.css`.
-- Legacy `agent-shelf.json` assumptions in code/tests/docs. No live skill manifest files currently exist on `main`.
-
----
-
-### Task 1: Add the canonical item schema
+### Task 1: Canonical item schema
 
 **Files:**
 - Create: `lib/item-schema.mjs`
 - Create: `tests/item-schema.mjs`
 
 **Interfaces:**
-- Produces: `validateItem(item, context)` where `context = { expectedType, expectedCategory, expectedSlug }`.
-- Produces: `deriveTrustCode(item)` returning one of `exact-upstream`, `own-repository`, `personal`, `derived`, `generated`.
-- Produces: `contentFilename(type)` returning `SKILL.md` or `PROMPT.md`.
-- Produces: `isSafeRelativePath(value)` for provenance path validation.
+- `validateItem(item, { expectedType, expectedCategory, expectedSlug } = {})`
+- `deriveTrustCode(item)`
+- `contentFilename(type)`
+- `isSafeRelativePath(value)`
 
-- [ ] **Step 1: Write schema tests before implementation**
+- [ ] **Step 1: Write failing schema tests**
 
-Create `tests/item-schema.mjs` with fixtures covering every allowed origin and all forbidden combinations. Include assertions equivalent to:
+Use fixtures with these exact rules:
 
 ```js
-import assert from 'node:assert/strict';
-import { validateItem, deriveTrustCode, contentFilename } from '../lib/item-schema.mjs';
-
 const SHA40 = '0123456789abcdef0123456789abcdef01234567';
 const HASH64 = 'a'.repeat(64);
 
@@ -108,64 +72,30 @@ const upstream = {
   integrity: { mode: 'exact-upstream', sha256: HASH64, bytes: 123 },
   tracking: { imported_at: '2026-09-11T13:00:00.000Z' }
 };
-
-assert.doesNotThrow(() => validateItem(upstream, {
-  expectedType: 'skill', expectedCategory: 'svg-vector', expectedSlug: 'svg-authoring'
-}));
-assert.equal(deriveTrustCode(upstream), 'exact-upstream');
-assert.equal(contentFilename('skill'), 'SKILL.md');
-assert.equal(contentFilename('prompt'), 'PROMPT.md');
-
-for (const badCommit of ['main', 'abc123']) {
-  const item = structuredClone(upstream);
-  item.origin.commit = badCommit;
-  assert.throws(() => validateItem(item), /40-character/i);
-}
-
-for (const forbiddenField of ['title_sl', 'description_sl', 'tags_sl', 'verification', 'trust_label', 'badge']) {
-  const item = structuredClone(upstream);
-  item[forbiddenField] = 'forbidden';
-  assert.throws(() => validateItem(item), /forbidden|translated|trust/i);
-}
-
-for (const originType of ['personal', 'derived', 'generated']) {
-  const item = structuredClone(upstream);
-  item.origin = originType === 'personal'
-    ? { type: 'personal', author: 'endpuppet' }
-    : originType === 'derived'
-      ? { type: 'derived', reference: 'test-knowledge-base/prompts/research' }
-      : { type: 'generated', author: 'endpuppet', generator: 'ChatGPT' };
-  item.integrity = { mode: 'content-hash', sha256: HASH64, bytes: 123 };
-  assert.doesNotThrow(() => validateItem(item));
-  assert.notEqual(deriveTrustCode(item), 'exact-upstream');
-}
-
-{
-  const item = structuredClone(upstream);
-  item.origin = { type: 'personal', author: 'endpuppet' };
-  assert.throws(() => validateItem(item), /exact-upstream|incompatible/i);
-}
-
-assert.throws(() => validateItem({ ...upstream, origin: { type: 'unknown' } }), /origin/i);
-assert.throws(() => validateItem(upstream, { expectedCategory: 'other' }), /category/i);
-assert.throws(() => validateItem(upstream, { expectedSlug: 'other' }), /slug/i);
 ```
 
-Also include explicit valid fixtures for `github-owned`, `personal`, `derived`, and `generated`.
+Tests must prove:
+- all five enabled origins validate: `github-upstream`, `github-owned`, `personal`, `derived`, `generated`;
+- `external-url` fails in schema v1;
+- mutable/short commits fail for exact upstream;
+- unsafe source paths fail;
+- `personal`, `derived`, and `generated` cannot use `exact-upstream` integrity;
+- translated fields `title_sl`, `description_sl`, `tags_sl` fail;
+- authored trust fields `verification`, `trust_label`, `badge` fail;
+- filesystem category/slug/type mismatches fail;
+- trust derivation returns only `exact-upstream`, `own-repository`, `personal`, `derived`, or `generated`.
 
-- [ ] **Step 2: Run the schema test and verify it fails**
-
-Run:
+- [ ] **Step 2: Run the test**
 
 ```bash
 node tests/item-schema.mjs
 ```
 
-Expected: failure because `lib/item-schema.mjs` does not exist.
+Expected: failure because the module does not yet exist.
 
-- [ ] **Step 3: Implement `lib/item-schema.mjs` minimally**
+- [ ] **Step 3: Implement the schema module**
 
-Implement constants and checks directly with built-in JavaScript. Use this public shape:
+Use:
 
 ```js
 const SEGMENT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -174,47 +104,21 @@ const SHA256 = /^[0-9a-f]{64}$/;
 const TYPES = new Set(['skill', 'prompt']);
 const ORIGINS = new Set(['github-upstream', 'github-owned', 'personal', 'derived', 'generated']);
 const FORBIDDEN_FIELDS = new Set(['title_sl', 'description_sl', 'tags_sl', 'verification', 'trust_label', 'badge']);
-
-export function contentFilename(type) {
-  if (type === 'skill') return 'SKILL.md';
-  if (type === 'prompt') return 'PROMPT.md';
-  throw new Error(`Unsupported item type: ${type}`);
-}
-
-export function isSafeRelativePath(value) {
-  return typeof value === 'string'
-    && value.length > 0
-    && !value.startsWith('/')
-    && !value.split('/').includes('..');
-}
 ```
 
-`validateItem` must check required top-level fields, forbidden translated/trust fields, kebab-case category/slug, optional filesystem expectations, origin-specific requirements, integrity shape, and incompatible combinations. `external-url` must fail as unsupported in schema version 1.
+Require non-empty `id`, `title`; allow empty `description`; require `tags` array; require `origin`, `integrity`, and `tracking` objects. `github-upstream` requires `repository`, safe `path`, full `commit`, and `integrity.mode === 'exact-upstream'`. Other origins require `content-hash`. `derived` requires a non-empty `reference`; `personal` requires `author`; `generated` requires `author`; `github-owned` requires `repository` and `path` and may include a full `commit`.
 
-`deriveTrustCode` must be pure metadata classification only:
-
-```js
-export function deriveTrustCode(item) {
-  validateItem(item);
-  if (item.origin.type === 'github-upstream' && item.integrity.mode === 'exact-upstream') return 'exact-upstream';
-  if (item.origin.type === 'github-owned') return 'own-repository';
-  return item.origin.type;
-}
-```
-
-This function does not claim the network verifier passed; publication safety comes from CI ordering.
+`deriveTrustCode` must classify metadata only and must never imply the remote verifier passed.
 
 - [ ] **Step 4: Run schema tests**
-
-Run:
 
 ```bash
 node tests/item-schema.mjs
 ```
 
-Expected: PASS with a single final success line.
+Expected: PASS.
 
-- [ ] **Step 5: Commit Task 1**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add lib/item-schema.mjs tests/item-schema.mjs
@@ -223,19 +127,17 @@ git commit -m "feat: add canonical item schema"
 
 ---
 
-### Task 2: Migrate existing prompts to canonical `item.json`
+### Task 2: Migrate the four existing prompts without touching prompt bytes
 
 **Files:**
-- Create four prompt `item.json` files listed in Planned File Structure.
-- Test: extend `tests/item-schema.mjs` or add migration assertions to `tests/verify.mjs` only after generation exists.
+- Create: `prompts/research/research-max/item.json`
+- Create: `prompts/web-prototypes/svg-world/item.json`
+- Create: `prompts/web-prototypes/critter-prototype/item.json`
+- Create: `prompts/visual-assets/scene-decomposition/item.json`
 
-**Interfaces:**
-- Consumes: `validateItem` from Task 1.
-- Produces: four valid canonical prompt records with `origin.type = derived` and `integrity.mode = content-hash`.
+**Interfaces:** Uses `validateItem` from Task 1.
 
-- [ ] **Step 1: Prove prompt bytes before metadata changes**
-
-Run this exact command and save the output in the implementation notes/terminal log:
+- [ ] **Step 1: Record current prompt hashes and byte lengths**
 
 ```bash
 node --input-type=module - <<'NODE'
@@ -253,74 +155,73 @@ for (const file of [
 NODE
 ```
 
-Do not edit any `PROMPT.md` in this task.
+- [ ] **Step 2: Generate all four metadata files programmatically**
 
-- [ ] **Step 2: Create each `item.json`**
+Run a Node script that reads each prompt byte buffer, computes SHA-256 and byte length, and writes `item.json`. Use these canonical catalog values and lineage references:
 
-Use current English catalog metadata exactly for `title`, `description`, and `tags`. Use the existing prompt frontmatter lineage as `origin.reference`:
-
-- `research-max`: `test-knowledge-base/prompts/research`
-- `svg-world`: `test-knowledge-base/prompts/svgworld`
-- `critter-prototype`: `test-knowledge-base/prompts/critterproto`
-- `scene-decomposition`: `Popackani / ENDNODE scene-separation workflow`
-
-Each file follows:
-
-```json
-{
-  "schema_version": 1,
-  "id": "prompt-research-research-max",
-  "type": "prompt",
-  "category": "research",
-  "slug": "research-max",
-  "title": "Research Max",
-  "description": "Evidence-first research orchestration with depth levels, modifiers, source verification, and practical synthesis.",
-  "tags": ["research", "verification", "tools", "sources"],
-  "origin": {
-    "type": "derived",
-    "reference": "test-knowledge-base/prompts/research"
+```js
+const prompts = [
+  {
+    category: 'research', slug: 'research-max', id: 'prompt-research-research-max',
+    title: 'Research Max',
+    description: 'Evidence-first research orchestration with depth levels, modifiers, source verification, and practical synthesis.',
+    tags: ['research', 'verification', 'tools', 'sources'],
+    reference: 'test-knowledge-base/prompts/research'
   },
-  "integrity": {
-    "mode": "content-hash",
-    "sha256": "<insert hash printed by Step 1>",
-    "bytes": 2094
+  {
+    category: 'web-prototypes', slug: 'svg-world', id: 'prompt-web-svg-world',
+    title: 'SVG World',
+    description: 'Build a mobile-first single-file interactive world authored from inline SVG with constrained skill routing and an implementation audit.',
+    tags: ['svg', 'prototype', 'mobile-first', 'interactive'],
+    reference: 'test-knowledge-base/prompts/svgworld'
   },
-  "tracking": {}
-}
+  {
+    category: 'web-prototypes', slug: 'critter-prototype', id: 'prompt-web-critter-prototype',
+    title: 'Critter Prototype',
+    description: 'Create a tiny mobile-first world whose critters behave autonomously, react to touch, and recover naturally after interaction.',
+    tags: ['canvas', 'critters', 'prototype', 'interaction'],
+    reference: 'test-knowledge-base/prompts/critterproto'
+  },
+  {
+    category: 'visual-assets', slug: 'scene-decomposition', id: 'prompt-assets-scene-decomposition',
+    title: 'Scene Decomposition',
+    description: 'Analyze a flattened scene and plan a compact set of clean, reusable layers for interactive 2D/2.5D or WebGPU reconstruction.',
+    tags: ['assets', 'layers', '2.5d', 'webgpu'],
+    reference: 'Popackani / ENDNODE scene-separation workflow'
+  }
+];
 ```
 
-Use the Step 1 output for every hash and byte count rather than copying assumed values from Git metadata.
+For each entry, the script must create:
 
-- [ ] **Step 3: Validate all four prompt items**
-
-Run:
-
-```bash
-node --input-type=module - <<'NODE'
-import fs from 'node:fs';
-import path from 'node:path';
-import { validateItem } from './lib/item-schema.mjs';
-for (const file of [
-  'prompts/research/research-max/item.json',
-  'prompts/web-prototypes/svg-world/item.json',
-  'prompts/web-prototypes/critter-prototype/item.json',
-  'prompts/visual-assets/scene-decomposition/item.json'
-]) {
-  const item = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const [, category, slug] = file.split('/');
-  validateItem(item, { expectedType: 'prompt', expectedCategory: category, expectedSlug: slug });
-}
-console.log('Prompt item metadata validates.');
-NODE
+```js
+const bytes = fs.readFileSync(contentPath);
+const item = {
+  schema_version: 1,
+  id: prompt.id,
+  type: 'prompt',
+  category: prompt.category,
+  slug: prompt.slug,
+  title: prompt.title,
+  description: prompt.description,
+  tags: prompt.tags,
+  origin: { type: 'derived', reference: prompt.reference },
+  integrity: {
+    mode: 'content-hash',
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    bytes: bytes.length
+  },
+  tracking: {}
+};
 ```
 
-Expected: `Prompt item metadata validates.`
+Write with `JSON.stringify(item, null, 2) + '\n'`.
 
-- [ ] **Step 4: Confirm prompt bodies are unchanged**
+- [ ] **Step 3: Validate every new item and re-check prompt hashes**
 
-Re-run the hash command from Step 1 and compare all four outputs byte-for-byte with the saved pre-change output.
+Run validation against filesystem expectations, then re-run Step 1's hash command. The before/after output must match exactly.
 
-- [ ] **Step 5: Commit Task 2**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add prompts/*/*/item.json
@@ -329,24 +230,15 @@ git commit -m "feat: add canonical prompt metadata"
 
 ---
 
-### Task 3: Migrate exact-upstream import and verification to `item.json`
+### Task 3: Move exact-upstream import and verification to `item.json`
 
-**Files:**
-- Modify: `lib/skill-integrity.mjs`
-- Modify: `tools/import-skill.mjs`
-- Modify: `tools/verify-imported-skills.mjs`
-- Modify: `tests/skill-integrity.mjs`
-- Modify: `tests/import-skill.mjs`
-- Modify: `tests/verify-imported-skills.mjs`
+**Files:** Modify `lib/skill-integrity.mjs`, `tools/import-skill.mjs`, `tools/verify-imported-skills.mjs`, `tests/skill-integrity.mjs`, `tests/import-skill.mjs`, `tests/verify-imported-skills.mjs`.
 
-**Interfaces:**
-- Consumes: `validateItem` from Task 1.
-- Produces: importer writing exact upstream bytes plus sibling `item.json`.
-- Produces: verifier scanning canonical skill items and rejecting orphan `SKILL.md` files.
+**Interfaces:** Importer writes exact bytes + `item.json`; verifier scans canonical item folders and rejects orphan `SKILL.md`.
 
-- [ ] **Step 1: Rewrite tests first for the canonical metadata shape**
+- [ ] **Step 1: Rewrite tests first**
 
-Change exact-upstream fixtures to:
+Change test fixtures from legacy metadata to:
 
 ```js
 const itemFor = (bytes = original) => ({
@@ -358,19 +250,15 @@ const itemFor = (bytes = original) => ({
   title: 'Exact Skill',
   description: 'Exact upstream fixture.',
   tags: [],
-  origin: { repository: 'owner/repo', path: 'SKILL.md', commit: COMMIT, type: 'github-upstream' },
+  origin: { type: 'github-upstream', repository: 'owner/repo', path: 'SKILL.md', commit: COMMIT },
   integrity: { mode: 'exact-upstream', sha256: sha256(bytes), bytes: bytes.length },
   tracking: { imported_at: '2026-09-11T13:00:00.000Z' }
 });
 ```
 
-Update temporary fixture directories to write `item.json`, not `agent-shelf.json`.
+Preserve all existing negative cases and add `SKILL.md` without `item.json` as an explicit failure.
 
-Add an orphan test that writes `skills/frontend/orphan/SKILL.md` without `item.json` and expects rejection matching `/orphan|item\.json/i`.
-
-Keep all current mutation cases: one-byte local mutation, upstream mutation, wrong hash, wrong byte count, mutable/short commit, traversal, missing source file, and zero imported skills.
-
-- [ ] **Step 2: Run the three integrity/import tests and verify failure**
+- [ ] **Step 2: Confirm tests fail before implementation**
 
 ```bash
 node tests/skill-integrity.mjs
@@ -378,65 +266,19 @@ node tests/import-skill.mjs
 node tests/verify-imported-skills.mjs
 ```
 
-Expected: failures due to legacy metadata shape/filename until implementation changes are made.
+- [ ] **Step 3: Refactor binary helpers without weakening them**
 
-- [ ] **Step 3: Refactor `lib/skill-integrity.mjs` without changing binary comparison semantics**
+`sha256(bytes)` remains unchanged. `rawGitHubUrl(item)` must validate canonical item metadata and use `item.origin.repository`, `item.origin.commit`, and `item.origin.path`. `verifyByteIdentity(localBytes, upstreamBytes, item)` must still check exact byte length, local hash, upstream hash, and `Buffer.equals`.
 
-Keep `sha256(bytes)` and `verifyByteIdentity(localBytes, upstreamBytes, item)` binary-safe. Change URL construction to read:
+- [ ] **Step 4: Migrate importer output**
 
-```js
-export function rawGitHubUrl(item) {
-  validateItem(item);
-  if (item.origin.type !== 'github-upstream' || item.integrity.mode !== 'exact-upstream') {
-    throw new Error('Raw upstream URL requires an exact-upstream GitHub item.');
-  }
-  const [owner, repo] = item.origin.repository.split('/');
-  const encodedPath = item.origin.path.split('/').map(encodeURIComponent).join('/');
-  return `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${item.origin.commit}/${encodedPath}`;
-}
-```
+Keep required CLI inputs `repo`, `commit`, `path`, `category`, `slug`. Add optional `title`, `description`, comma-separated `tags`. If title is omitted, derive a deterministic title from the slug. Write fetched response bytes directly to `SKILL.md`; compute integrity from that exact buffer; write sibling `item.json` as UTF-8 metadata only.
 
-`verifyByteIdentity` must continue using `Buffer.from(...)`, exact byte length, local SHA-256, upstream SHA-256, and `Buffer.equals`.
+- [ ] **Step 5: Migrate verifier scanning**
 
-- [ ] **Step 4: Change importer output to `item.json`**
+Scan `skills/<category>/<slug>/`. Every `SKILL.md` requires sibling `item.json`; every skill item requires sibling `SKILL.md`. Validate filesystem agreement. For `github-upstream + exact-upstream`, fetch the commit-pinned raw URL and perform exact binary verification. Do not read `catalog.json`.
 
-Keep these required CLI inputs: `repo`, `commit`, `path`, `category`, `slug`. Add optional `title`, `description`, and comma-separated `tags`. If `title` is omitted, derive a deterministic display title from the slug by replacing hyphens with spaces and title-casing words. Default description to an empty string and tags to `[]`.
-
-The importer must construct:
-
-```js
-const item = {
-  schema_version: 1,
-  id: `skill-${category}-${slug}`,
-  type: 'skill',
-  category,
-  slug,
-  title: title || slug.replaceAll('-', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-  description: description || '',
-  tags: tags ? tags.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
-  origin: { type: 'github-upstream', repository: repo, path: sourcePath, commit },
-  integrity: { mode: 'exact-upstream', sha256: sha256(bytes), bytes: bytes.length },
-  tracking: { imported_at: now().toISOString() }
-};
-```
-
-Write upstream response bytes directly with `fs.writeFileSync(skillFsPath, bytes)` and write only metadata JSON as UTF-8.
-
-- [ ] **Step 5: Rewrite verifier scanning logic**
-
-`tools/verify-imported-skills.mjs` must scan `skills/<category>/<slug>/` item directories, require `item.json` for every `SKILL.md`, validate filesystem agreement, and run network byte verification only for `github-upstream + exact-upstream` items.
-
-It must not read `catalog.json`.
-
-Reject:
-
-- `SKILL.md` without `item.json`;
-- `item.json` declaring type other than skill inside `skills/`;
-- exact-upstream metadata without a sibling skill;
-- any local/upstream byte mismatch;
-- unsupported trust combinations.
-
-- [ ] **Step 6: Run all three tests**
+- [ ] **Step 6: Run tests**
 
 ```bash
 node tests/skill-integrity.mjs
@@ -444,9 +286,9 @@ node tests/import-skill.mjs
 node tests/verify-imported-skills.mjs
 ```
 
-Expected: all PASS.
+Expected: PASS.
 
-- [ ] **Step 7: Commit Task 3**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add lib/skill-integrity.mjs tools/import-skill.mjs tools/verify-imported-skills.mjs tests/skill-integrity.mjs tests/import-skill.mjs tests/verify-imported-skills.mjs
@@ -455,65 +297,37 @@ git commit -m "feat: migrate verified skills to item metadata"
 
 ---
 
-### Task 4: Add deterministic filesystem-driven catalog generation
+### Task 4: Deterministic catalog builder
 
-**Files:**
-- Create: `lib/catalog-builder.mjs`
-- Create: `tools/generate-catalog.mjs`
-- Create: `tests/catalog-builder.mjs`
+**Files:** Create `lib/catalog-builder.mjs`, `tools/generate-catalog.mjs`, `tests/catalog-builder.mjs`.
 
 **Interfaces:**
-- Consumes: `validateItem`, `deriveTrustCode`, `contentFilename`.
-- Produces: `buildCatalog({ rootDir }) -> { version: 4, items: [...] }`.
-- Produces: `writeCatalog({ rootDir, outputPath })`.
+- `buildCatalog({ rootDir }) -> { version: 4, items: [...] }`
+- `writeCatalog({ rootDir, outputPath = 'catalog.json' })`
 
-- [ ] **Step 1: Write generation tests first**
+- [ ] **Step 1: Write failing generator tests**
 
-Create fixture helpers that build temporary `skills/` and `prompts/` trees. Test all of these behaviors explicitly:
+Tests must prove deterministic sort order, actual filesystem-derived content paths, derived trust codes, duplicate ID rejection, duplicate route rejection, metadata/filesystem mismatch rejection, wrong local content hash rejection, and structural deletion:
 
 ```js
-assert.deepEqual(buildCatalog({ rootDir }).items.map((item) => item.id), [
-  'prompt-research-a',
-  'prompt-research-b'
-]);
+const before = buildCatalog({ rootDir });
+assert.equal(before.items.length, 2);
+fs.rmSync(path.join(rootDir, 'prompts/research/remove-me'), { recursive: true, force: true });
+const after = buildCatalog({ rootDir });
+assert.deepEqual(after.items.map((item) => item.slug), ['keep-me']);
 ```
 
-Also assert:
-
-- output order is deterministic across two runs;
-- generated `path` is the actual sibling content path;
-- generated `trust` equals `deriveTrustCode(item)`;
-- duplicate IDs fail;
-- duplicate type/category/slug tuples fail;
-- metadata/filesystem mismatch fails;
-- wrong local content hash fails;
-- forbidden translated fields fail through schema validation;
-- deleting one fixture folder and rebuilding removes it from output.
-
-Use real bytes and `sha256` to construct valid fixture hashes.
-
-- [ ] **Step 2: Run generator tests and verify failure**
+- [ ] **Step 2: Run test and confirm failure**
 
 ```bash
 node tests/catalog-builder.mjs
 ```
 
-Expected: failure because generator modules do not exist.
+- [ ] **Step 3: Implement builder**
 
-- [ ] **Step 3: Implement `lib/catalog-builder.mjs`**
+Scan only `skills/*/*/item.json` and `prompts/*/*/item.json`. Validate each item against directory type/category/slug, require the correct sibling content file, verify local byte count and SHA-256, reject duplicate IDs/routes, and sort by type/category/slug/id.
 
-Scan only the two canonical glob shapes by walking exactly two directory levels beneath `skills/` and `prompts/`. Do not infer items from arbitrary nested JSON.
-
-For each item:
-
-1. read and parse `item.json`;
-2. validate type/category/slug against directory location;
-3. require sibling `SKILL.md` or `PROMPT.md`;
-4. read bytes and verify `integrity.bytes` and SHA-256;
-5. project canonical metadata into a UI record;
-6. sort by `type`, `category`, `slug`, then `id`.
-
-Generated projection shape:
+Project each item to:
 
 ```js
 {
@@ -532,162 +346,69 @@ Generated projection shape:
 }
 ```
 
-Do not add timestamps to catalog output.
+No generated current-time field is allowed.
 
-- [ ] **Step 4: Implement CLI writer**
-
-`tools/generate-catalog.mjs` should call `writeCatalog({ rootDir: process.cwd(), outputPath: 'catalog.json' })`, format JSON with two-space indentation and a trailing newline, and print the item count.
-
-- [ ] **Step 5: Run generator tests**
+- [ ] **Step 4: Implement CLI writer and run tests**
 
 ```bash
 node tests/catalog-builder.mjs
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Generate the real catalog and inspect it**
-
-```bash
 node tools/generate-catalog.mjs
-cat catalog.json
 ```
 
-Expected: exactly four prompt items, no `*_sl` fields, no skill items, and all paths point to existing prompt files.
+Expected: tests pass and real catalog contains four prompts, zero skills, no localized item fields.
 
-- [ ] **Step 7: Commit Task 4**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add lib/catalog-builder.mjs tools/generate-catalog.mjs tests/catalog-builder.mjs
 git commit -m "feat: generate catalog from filesystem metadata"
 ```
 
-Do not commit generated `catalog.json` yet; Task 7 finalizes its lifecycle.
+Do not stage generated `catalog.json`.
 
 ---
 
-### Task 5: Make UI metadata language-invariant and integrate provenance rendering
+### Task 5: Chrome-only translation and integrated provenance UI
 
-**Files:**
-- Modify: `app.js`
-- Modify: `index.html`
-- Modify: `styles.css`
-- Remove after integration: `verified-provenance.js`, `verified-provenance.css`
+**Files:** Modify `app.js`, `index.html`, `styles.css`, `tests/verify.mjs`; remove `verified-provenance.js` and `verified-provenance.css`.
 
-**Interfaces:**
-- Consumes: generated catalog fields `title`, `description`, `tags`, `trust`, `origin`, `integrity`.
-- Produces: one client-side catalog state owner in `app.js`.
+- [ ] **Step 1: Make static tests fail against old behavior**
 
-- [ ] **Step 1: Change tests first in `tests/verify.mjs`**
+Replace requirements for `title_sl`/`description_sl` with assertions that catalog items contain none of `title_sl`, `description_sl`, `tags_sl`. Add source assertions that trust/provenance chrome keys exist in both locale dictionaries.
 
-Replace tests that require `title_sl`/`description_sl` with assertions that generated catalog entries contain none of:
+Required keys: `trust_exact_upstream`, `trust_personal`, `trust_own_repository`, `trust_derived`, `trust_generated`, `provenance_repository`, `provenance_commit`, `provenance_fingerprint`.
 
-```js
-for (const item of catalog.items) {
-  for (const forbidden of ['title_sl', 'description_sl', 'tags_sl']) {
-    assert.equal(forbidden in item, false, `${item.id} must not contain ${forbidden}`);
-  }
-}
-```
-
-Add source assertions that `app.js` no longer defines `itemTitle`, `itemDescription`, or `itemTags` locale fallbacks using `*_sl`.
-
-Add assertions that WebUI translation dictionaries contain trust/provenance chrome keys such as:
-
-```text
-trust_exact_upstream
-trust_personal
-trust_own_repository
-trust_derived
-trust_generated
-provenance_repository
-provenance_commit
-provenance_fingerprint
-```
-
-- [ ] **Step 2: Run `tests/verify.mjs` and verify failure**
-
-```bash
-node tests/verify.mjs
-```
-
-Expected: failure against current localized item metadata behavior.
-
-- [ ] **Step 3: Remove item-level locale switching from `app.js`**
-
-Delete locale-dependent item helpers. Card/detail rendering must use:
-
-```js
-item.title
-item.description
-item.tags || []
-```
-
-Search text becomes:
-
-```js
-function searchText(item) {
-  return [item.title, item.description, item.category, ...(item.tags || [])]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-}
-```
-
-Category labels remain localized chrome through `categoryLabels`.
-
-- [ ] **Step 4: Integrate provenance UI into `app.js`**
-
-Move provenance state/rendering out of `verified-provenance.js`.
-
-Add translation keys in both locales for trust labels and provenance field labels. Keep values such as repository, commit, source path, and hash unchanged.
-
-Construct pinned source URLs only when:
-
-```js
-item.trust === 'exact-upstream'
-&& item.origin?.type === 'github-upstream'
-```
-
-Use full commit in the URL:
-
-```js
-function pinnedSourceUrl(item) {
-  const encodedPath = item.origin.path.split('/').map(encodeURIComponent).join('/');
-  return `https://github.com/${item.origin.repository}/blob/${item.origin.commit}/${encodedPath}`;
-}
-```
-
-Render the visible commit shortened only for display.
-
-- [ ] **Step 5: Move provenance markup/styles into primary files**
-
-Either keep provenance markup in `index.html` hidden by default or build it once from `app.js`; whichever is chosen, remove the duplicate catalog fetch. Move `.verification-badge` and provenance layout CSS into `styles.css`.
-
-Then remove script/style references to `verified-provenance.js` and `verified-provenance.css` from `index.html`.
-
-- [ ] **Step 6: Run static verification**
-
-First generate catalog:
+- [ ] **Step 2: Run test**
 
 ```bash
 node tools/generate-catalog.mjs
 node tests/verify.mjs
 ```
 
-Expected: PASS after Task 5 code changes.
+Expected: failure against current locale-dependent item rendering.
 
-- [ ] **Step 7: Manual locale smoke test**
+- [ ] **Step 3: Make item metadata invariant**
 
-Serve the repository with any static server, open the shelf, switch EN/SL, and confirm:
+Cards/details/search use only `item.title`, `item.description`, `item.tags`. Category labels remain translated chrome. `Research Max` must render unchanged in EN and SL.
 
-- `Research Max` remains exactly `Research Max`;
-- description/tags do not change language;
-- buttons/categories/status chrome do change language;
-- no duplicate catalog request is emitted by a separate provenance module;
-- hash deep links still open the expected item.
+- [ ] **Step 4: Fold provenance state into `app.js`**
 
-- [ ] **Step 8: Commit Task 5**
+Use generated `item.trust`, `item.origin`, `item.integrity`. Build pinned source URL only when `item.trust === 'exact-upstream'` and `origin.type === 'github-upstream'`. URL uses the full immutable commit; visible commit may be shortened. Translate label names, never provenance values.
+
+- [ ] **Step 5: Remove duplicate provenance module**
+
+Move provenance styles to `styles.css`, remove its standalone JS/CSS includes, and ensure catalog is fetched once by primary application state.
+
+- [ ] **Step 6: Run tests and manual locale smoke**
+
+```bash
+node tools/generate-catalog.mjs
+node tests/verify.mjs
+```
+
+Then serve statically and verify EN/SL changes chrome only, deep links still resolve, and prompt metadata never changes language.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add app.js index.html styles.css tests/verify.mjs
@@ -697,22 +418,13 @@ git commit -m "feat: limit translation to WebUI chrome"
 
 ---
 
-### Task 6: Make CI and Pages generate catalog from canonical state
+### Task 6: CI and Pages generation pipeline
 
-**Files:**
-- Modify: `.github/workflows/verify.yml`
-- Modify: `.github/workflows/pages.yml`
-- Modify: `tests/verify.mjs`
+**Files:** Modify `.github/workflows/verify.yml`, `.github/workflows/pages.yml`, `tests/verify.mjs`.
 
-**Interfaces:**
-- Consumes: `tools/generate-catalog.mjs`, canonical verifier.
-- Produces: generated catalog before static tests and before Pages artifact upload.
+- [ ] **Step 1: Add workflow-order tests first**
 
-- [ ] **Step 1: Add workflow-order assertions first**
-
-Update `tests/verify.mjs` so it asserts both workflow files contain `node tools/generate-catalog.mjs`.
-
-For Pages, assert ordering:
+Assert both workflows call `node tools/generate-catalog.mjs`. For Pages assert:
 
 ```js
 const verifyIndex = pagesWorkflow.indexOf('node tools/verify-imported-skills.mjs');
@@ -721,59 +433,17 @@ const uploadIndex = pagesWorkflow.indexOf('actions/upload-pages-artifact');
 assert.ok(verifyIndex >= 0 && verifyIndex < generateIndex && generateIndex < uploadIndex);
 ```
 
-Also assert regular CI generates before `node tests/verify.mjs`.
+Also require static verification after generation.
 
-- [ ] **Step 2: Run static test and verify failure**
+- [ ] **Step 2: Update verification workflow**
 
-```bash
-node tests/verify.mjs
-```
+Use this order: item-schema tests, integrity tests, importer tests, imported-skill verifier tests, production network verifier, catalog-builder tests, catalog generation, static verification.
 
-Expected: failure because workflows have not yet been updated.
+- [ ] **Step 3: Update Pages workflow**
 
-- [ ] **Step 3: Update verification workflow order**
+Use: checkout → configure Pages → exact-upstream network verification → generate catalog → static verification → upload Pages artifact → deploy → existing smoke test.
 
-Use this order in `.github/workflows/verify.yml`:
-
-```yaml
-- name: Run item schema tests
-  run: node tests/item-schema.mjs
-- name: Run skill integrity tests
-  run: node tests/skill-integrity.mjs
-- name: Run importer tests
-  run: node tests/import-skill.mjs
-- name: Run imported skill verifier tests
-  run: node tests/verify-imported-skills.mjs
-- name: Verify imported skills against pinned upstream bytes
-  run: node tools/verify-imported-skills.mjs
-- name: Run catalog builder tests
-  run: node tests/catalog-builder.mjs
-- name: Generate catalog from canonical metadata
-  run: node tools/generate-catalog.mjs
-- name: Run static verification
-  run: node tests/verify.mjs
-```
-
-- [ ] **Step 4: Update Pages workflow order**
-
-Keep the network verifier before generated artifact creation:
-
-```yaml
-- name: Verify imported skills against pinned upstream bytes
-  run: node tools/verify-imported-skills.mjs
-- name: Generate catalog from canonical metadata
-  run: node tools/generate-catalog.mjs
-- name: Run static verification
-  run: node tests/verify.mjs
-- name: Upload static site
-  uses: actions/upload-pages-artifact@v4
-  with:
-    path: .
-```
-
-Do not move verification after artifact upload.
-
-- [ ] **Step 5: Run local workflow-equivalent commands**
+- [ ] **Step 4: Run local publication-equivalent sequence**
 
 ```bash
 node tests/item-schema.mjs
@@ -786,9 +456,9 @@ node tools/generate-catalog.mjs
 node tests/verify.mjs
 ```
 
-Expected: every command succeeds; production verifier prints `Verified 0 imported skills.` on the current repository state.
+Expected: all succeed; production verifier reports zero imported skills on current state.
 
-- [ ] **Step 6: Commit Task 6**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add .github/workflows/verify.yml .github/workflows/pages.yml tests/verify.mjs
@@ -797,161 +467,98 @@ git commit -m "ci: generate catalog from canonical metadata"
 
 ---
 
-### Task 7: Remove manual catalog authority and prove deletion semantics end-to-end
+### Task 7: Remove manual catalog authority
 
-**Files:**
-- Remove tracked: `catalog.json`
-- Create or modify: `.gitignore`
-- Modify: `tests/catalog-builder.mjs`
-- Modify: `tests/verify.mjs` only if necessary for generated-file precondition messaging.
+**Files:** Remove tracked `catalog.json`; create/modify `.gitignore`; strengthen `tests/catalog-builder.mjs`.
 
-**Interfaces:**
-- Consumes: generator and CI behavior from Tasks 4 and 6.
-- Produces: no human-maintained inventory file; generated catalog exists only after generation.
+- [ ] **Step 1: Ensure structural deletion regression exists**
 
-- [ ] **Step 1: Strengthen deletion regression test**
+The builder test must delete an item folder, regenerate, and prove the deleted route is absent with no other edit.
 
-In `tests/catalog-builder.mjs`, ensure the test sequence is exactly:
+- [ ] **Step 2: Ignore generated catalog**
 
-```js
-const before = buildCatalog({ rootDir });
-assert.equal(before.items.length, 2);
-fs.rmSync(path.join(rootDir, 'prompts/research/remove-me'), { recursive: true, force: true });
-const after = buildCatalog({ rootDir });
-assert.deepEqual(after.items.map((item) => item.slug), ['keep-me']);
-```
-
-- [ ] **Step 2: Add `catalog.json` to `.gitignore`**
-
-If `.gitignore` does not exist, create it with:
+Add exactly:
 
 ```gitignore
 catalog.json
 ```
 
-If it exists by implementation time, append only the missing line.
-
-- [ ] **Step 3: Remove tracked `catalog.json`**
+- [ ] **Step 3: Remove tracked manual catalog and prove clean regeneration**
 
 ```bash
 git rm catalog.json
-```
-
-- [ ] **Step 4: Prove clean regeneration from a catalog-less checkout**
-
-```bash
 rm -f catalog.json
 node tools/generate-catalog.mjs
 test -f catalog.json
 node tests/verify.mjs
 rm -f catalog.json
+git status --short
 ```
 
-Expected: generation creates the file; tests pass while it exists; deleting the generated artifact leaves Git clean because it is ignored.
+Expected: generated catalog is absent from Git status because it is ignored.
 
-- [ ] **Step 5: Run deletion regression again**
-
-```bash
-node tests/catalog-builder.mjs
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit Task 7**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add .gitignore tests/catalog-builder.mjs
-git rm --cached catalog.json 2>/dev/null || true
 git commit -m "refactor: make catalog a generated artifact"
 ```
 
-If `git rm catalog.json` from Step 3 already staged the deletion, do not run a second removal command.
+The staged deletion of `catalog.json` must be included in the same commit.
 
 ---
 
-### Task 8: Update repository policy/docs to the new contract
+### Task 8: Documentation and policy cutover
 
-**Files:**
-- Modify: `AGENTS.md`
-- Modify: `README.md`
-- Modify: `FUTURE_RELEASES.md`
+**Files:** Modify `AGENTS.md`, `README.md`, `FUTURE_RELEASES.md`.
 
-**Interfaces:**
-- Produces: agent guidance consistent with actual Release A implementation.
+- [ ] **Step 1: Update `AGENTS.md`**
 
-- [ ] **Step 1: Update `AGENTS.md` immutable-skill policy**
+Keep `NEVER author or modify an imported SKILL.md`. Replace `agent-shelf.json` rules with canonical `item.json`; state catalog is generated; trust labels are derived; only WebUI chrome is translated; folder deletion removes items after regeneration; full-SHA importer/verifier rules remain mandatory.
 
-Replace references to sibling `agent-shelf.json` with `item.json` and state explicitly:
+- [ ] **Step 2: Update `README.md`**
 
-- imported `SKILL.md` remains immutable exact upstream bytes;
-- canonical metadata is in `item.json`;
-- trust labels are derived;
-- `catalog.json` is generated and must never be hand-maintained;
-- only WebUI chrome is translated;
-- deleting an item folder removes it from generated UI state;
-- imports still require the import tool and full SHA;
-- verifier failure blocks completion/publication.
-
-Keep the existing `NEVER author or modify an imported SKILL.md` warning intact.
-
-- [ ] **Step 2: Update `README.md` structure and workflow**
-
-Document:
+Document canonical structure:
 
 ```text
 skills/<category>/<slug>/SKILL.md + item.json
 prompts/<category>/<slug>/PROMPT.md + item.json
 ```
 
-Document local preview sequence:
+Document local preview requirement:
 
 ```bash
 node tools/generate-catalog.mjs
-# then serve the repository with a static server
 ```
 
-State that generated `catalog.json` is ignored by Git and recreated by CI/Pages.
+State that `catalog.json` is generated and ignored by Git.
 
-- [ ] **Step 3: Mark Release A status in `FUTURE_RELEASES.md`**
+- [ ] **Step 3: Update roadmap status**
 
-Keep the roadmap intact but annotate Release A as implemented once all tests pass. Do not alter later release scope.
+Mark Release A implemented only after all tests pass. Do not rewrite Release B–F scope.
 
-- [ ] **Step 4: Run policy/static tests**
-
-Generate catalog first, then run:
+- [ ] **Step 4: Run verification and commit**
 
 ```bash
 node tools/generate-catalog.mjs
 node tests/verify.mjs
-```
-
-Expected: PASS, including AGENTS policy assertions.
-
-- [ ] **Step 5: Commit Task 8**
-
-```bash
 git add AGENTS.md README.md FUTURE_RELEASES.md
 git commit -m "docs: document canonical Agent Shelf model"
 ```
 
 ---
 
-### Task 9: Final Release A verification and PR preparation
+### Task 9: Final verification and PR gate
 
-**Files:**
-- No new implementation files expected.
-- Review all files changed by Tasks 1–8.
+**Files:** Review all Release A changes; no new production files expected.
 
-**Interfaces:**
-- Produces: one reviewable short-lived Release A implementation branch ready for PR into trusted `main`.
-
-- [ ] **Step 1: Start from no generated catalog**
+- [ ] **Step 1: Start without generated catalog**
 
 ```bash
 rm -f catalog.json
 ```
 
-- [ ] **Step 2: Run the complete test suite in publication order**
+- [ ] **Step 2: Run the complete suite in publication order**
 
 ```bash
 node tests/item-schema.mjs
@@ -964,28 +571,9 @@ node tools/generate-catalog.mjs
 node tests/verify.mjs
 ```
 
-Expected:
+Expected: every command exits 0; generated catalog has four prompts and zero skills; no translated item metadata exists.
 
-- every command exits 0;
-- production exact-upstream verifier reports zero imported skills on current shelf state;
-- generated catalog contains four prompts and zero skills;
-- generated catalog has no `title_sl`, `description_sl`, or `tags_sl`;
-- generated catalog is ignored by Git.
-
-- [ ] **Step 3: Verify exact-upstream regression behavior with fixtures**
-
-Re-run specifically:
-
-```bash
-node tests/skill-integrity.mjs
-node tests/verify-imported-skills.mjs
-```
-
-Confirm logs show the mutation and line-ending cases are exercised by the test file and the suite passes only because those cases are correctly rejected.
-
-- [ ] **Step 4: Confirm no legacy authority remains**
-
-Run:
+- [ ] **Step 3: Scan for obsolete live assumptions**
 
 ```bash
 git grep -n "agent-shelf.json" -- ':!docs/superpowers/**' || true
@@ -993,33 +581,19 @@ git grep -n "title_sl\|description_sl\|tags_sl" -- ':!docs/superpowers/**' || tr
 git grep -n 'verification.*exact-upstream' -- ':!docs/superpowers/**' || true
 ```
 
-Expected: no live code/config/docs references requiring legacy metadata or translated item fields. References inside historical Superpowers design documents are allowed.
+Expected: no live code/config/current docs depend on legacy metadata, translated item fields, or authored exact-upstream trust. Historical Superpowers docs may mention the old architecture.
 
-- [ ] **Step 5: Confirm generated catalog is not authoritative**
-
-```bash
-git status --short
-```
-
-Expected: `catalog.json` is absent from status even after generation because it is ignored.
-
-- [ ] **Step 6: Review diff for trust regressions**
+- [ ] **Step 4: Review the security-critical diff**
 
 ```bash
 git diff main...HEAD -- .gitattributes lib/skill-integrity.mjs tools/import-skill.mjs tools/verify-imported-skills.mjs .github/workflows/pages.yml
 ```
 
-Reviewer must confirm:
+Confirm `.gitattributes` remains unchanged, exact bytes are still written directly, `Buffer.equals` verification remains, full SHA validation remains, and Pages verification still precedes artifact upload.
 
-- `.gitattributes` remains unchanged;
-- importer still writes exact upstream bytes directly;
-- verifier still compares local/upstream buffers exactly;
-- full SHA enforcement remains;
-- Pages verifier still occurs before artifact upload.
+- [ ] **Step 5: Open the implementation PR**
 
-- [ ] **Step 7: Commit any test-only final fixes, then open PR**
-
-If no changes are needed, do not create an empty commit. Open a PR from the implementation branch to `main` with a summary containing:
+PR summary:
 
 ```text
 Release A: canonical item model
@@ -1032,12 +606,8 @@ Release A: canonical item model
 - makes folder deletion remove catalog entries on regeneration
 ```
 
-The PR must not be merged until GitHub CI is green.
-
----
+Do not merge until CI is green.
 
 ## Self-Review Result
 
-The plan covers every Release A design requirement: canonical `item.json`, all defined origin classes except intentionally disabled `external-url`, exact-upstream verifier migration, local content hashing, deterministic generated catalog, deletion semantics, translation boundary, provenance UI consolidation, CI/Pages ordering, documentation, and regression protection.
-
-No Release B–F mutation, authentication, update-tracking, private-content, or friendly-URL functionality is included.
+Every Release A design requirement maps to a task above: canonical metadata, origin/provenance schema, exact-upstream preservation, local hashes, deterministic catalog generation, structural deletion semantics, translation boundary, provenance UI consolidation, CI/Pages ordering, and repository documentation. No unresolved placeholders or Release B–F implementation work remain in this plan.
