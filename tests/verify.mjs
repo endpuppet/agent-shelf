@@ -11,6 +11,15 @@ const html = read('index.html');
 const css = read('styles.css');
 const catalog = JSON.parse(read('catalog.json'));
 
+
+const skillEntries = catalog.items.filter((item) => item.type === 'skill');
+const skillFiles = exists('skills')
+  ? fs.readdirSync('skills', {recursive: true, withFileTypes: true})
+      .filter((entry) => entry.isFile() && entry.name === 'SKILL.md')
+  : [];
+assert.equal(skillEntries.length, 0, 'Cleanup state must contain zero skill catalog entries.');
+assert.equal(skillFiles.length, 0, 'Cleanup state must contain no SKILL.md files.');
+
 assert.match(app, /raw\.githubusercontent\.com/, 'Markdown loader needs a raw.githubusercontent.com fallback.');
 assert.match(app, /localStorage/, 'Theme and language choices should persist locally.');
 assert.match(html, /id="language-toggle"/, 'UI needs an EN/SL language control.');
