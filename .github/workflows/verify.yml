@@ -20,6 +20,8 @@ jobs:
         run: node tests/item-schema.mjs
       - name: Run catalog builder tests
         run: node tests/catalog-builder.mjs
+      - name: Generate catalog from canonical metadata
+        run: node tools/generate-catalog.mjs
       - name: Run skill integrity tests
         run: node tests/skill-integrity.mjs
       - name: Run importer tests
