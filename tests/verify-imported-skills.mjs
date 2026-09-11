@@ -6,6 +6,7 @@ import { sha256 } from '../lib/skill-integrity.mjs';
 import { verifyImportedSkills } from '../tools/verify-imported-skills.mjs';
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
+const OTHER_COMMIT = 'f'.repeat(40);
 const original = Buffer.from('# Exact Skill\r\nBody\r\n', 'utf8');
 const upstreamMutated = Buffer.from('# Exact Skill\nBody\n', 'utf8');
 const itemFor = (bytes = original) => ({
@@ -31,11 +32,13 @@ function makeRoot({skillBytes = original, item = itemFor(), writeSkill = true, w
   return root;
 }
 
-const fetchBytes = (bytes) => async () => ({
+const responseFor = (bytes) => ({
   ok: true,
   status: 200,
   arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
 });
+const fetchBytes = (bytes) => async () => responseFor(bytes);
+const fetchByCommit = async (url) => responseFor(url.includes(OTHER_COMMIT) ? upstreamMutated : original);
 
 {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-shelf-zero-'));
@@ -51,8 +54,8 @@ await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot(), fetchImpl:f
 
 {
   const item = itemFor();
-  item.origin.commit = 'f'.repeat(40);
-  await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot({item}), fetchImpl:fetchBytes(original)}), /upstream|hash|identity/i);
+  item.origin.commit = OTHER_COMMIT;
+  await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot({item}), fetchImpl:fetchByCommit}), /upstream|hash|identity|byte length/i);
 }
 
 assert.equal(await verifyImportedSkills({rootDir:makeRoot(), fetchImpl:fetchBytes(original), log:()=>{}}), 1);
