@@ -1,6 +1,6 @@
 # Agent Shelf — Future Releases Roadmap
 
-This file records planned and suggested future workflows for Agent Shelf. It is intentionally broader than a task list: it defines the direction of the product so future conversations and agents can continue without re-litigating core decisions.
+This file records implemented foundations plus planned and suggested future workflows for Agent Shelf. It defines the product direction so future conversations and agents can continue without re-litigating core decisions.
 
 ## Current baseline
 
@@ -8,14 +8,18 @@ This file records planned and suggested future workflows for Agent Shelf. It is 
 - GitHub Pages publishes from `main` only after verification passes.
 - Imported upstream skills are protected by the exact-upstream safety system.
 - Verified upstream `SKILL.md` files must remain byte-for-byte identical to the recorded source at a full 40-character Git commit SHA.
-- Current shelf state after cleanup: zero imported skills; existing prompts remain.
-- Prompts are not covered by the exact-upstream skill integrity guarantee unless a future provenance mode explicitly adds such a guarantee.
+- Release A established the canonical per-item `item.json` model.
+- The filesystem plus `item.json` are the canonical source of truth.
+- `catalog.json` is deterministic generated output and is ignored by Git.
+- Only WebUI chrome is translated between English and Slovenian.
+- Current shelf state after cleanup: zero imported skills; existing prompts remain and have canonical sibling metadata.
+- Prompts are not covered by the exact-upstream skill guarantee unless a future provenance mode explicitly adds such a guarantee.
 
 ## Core direction
 
-Agent Shelf should evolve from a manually maintained catalog into a Git-backed content registry with provenance, version history, safe write workflows, and multiple input paths.
+Agent Shelf is evolving from a manually maintained catalog into a Git-backed content registry with provenance, version history, safe write workflows, and multiple input paths.
 
-The filesystem plus item metadata should become the canonical source. Generated UI indexes such as `catalog.json` should be derived artifacts, not manually maintained parallel state.
+Release A completed the read-side data foundation. Future releases should build writes and update tracking on top of the same canonical filesystem + `item.json` model rather than introducing parallel metadata stores.
 
 ## Branching and versioning model
 
@@ -35,7 +39,7 @@ Optional future snapshot tags may be used for major milestones, for example `she
 
 ## Canonical content structure
 
-Target structure:
+Implemented in Release A:
 
 ```text
 skills/
@@ -53,20 +57,22 @@ prompts/
 
 `SKILL.md` and `PROMPT.md` are the actual agent inputs.
 
-`item.json` stores Agent Shelf metadata, provenance, tracking, origin, integrity information, display metadata, and future workflow state. Metadata must never be injected into an immutable upstream `SKILL.md`.
+`item.json` stores Agent Shelf metadata, provenance, tracking, origin, integrity information, and future workflow state. Metadata must never be injected into an immutable upstream `SKILL.md`.
+
+Filesystem type/category/slug and item metadata must agree. Content paths, routes, and visible trust labels are derived rather than independently authored.
 
 ## Provenance for every skill
 
 Every skill should always record its origin. Provenance must remain visible and machine-readable even for personal skills.
 
-Suggested origin types:
+Schema-v1 origin types:
 
-- `github-upstream` — exact imported skill from a repository not owned by the user.
-- `github-owned` — source lives in another repository owned by the user.
+- `github-upstream` — exact imported skill from a public GitHub repository.
+- `github-owned` — source lives in another repository owned/controlled by the user.
 - `personal` — authored directly for Agent Shelf by the user.
 - `derived` — intentionally adapted from another source.
 - `generated` — created with AI or another generator and then owned as a new artifact.
-- `external-url` — future fallback for non-GitHub sources if exact verification can be made trustworthy.
+- `external-url` — reserved for a later release; not enabled as a verified origin mode today.
 
 Example verified upstream metadata:
 
@@ -75,23 +81,24 @@ Example verified upstream metadata:
   "schema_version": 1,
   "id": "skill-svg-authoring",
   "type": "skill",
-  "name": "SVG Authoring",
   "category": "svg-vector",
+  "slug": "svg-authoring",
+  "title": "SVG Authoring",
+  "description": "...",
+  "tags": ["svg"],
   "origin": {
     "type": "github-upstream",
     "repository": "owner/repo",
     "path": "path/to/SKILL.md",
-    "commit": "40-character-commit-sha",
-    "url": "https://github.com/owner/repo/..."
+    "commit": "40-character-commit-sha"
   },
   "integrity": {
+    "mode": "exact-upstream",
     "sha256": "...",
     "bytes": 12345
   },
   "tracking": {
-    "imported_at": "...",
-    "last_checked_at": "...",
-    "upstream_status": "current"
+    "imported_at": "..."
   }
 }
 ```
@@ -103,17 +110,22 @@ Example personal origin:
   "origin": {
     "type": "personal",
     "author": "endpuppet"
+  },
+  "integrity": {
+    "mode": "content-hash",
+    "sha256": "...",
+    "bytes": 12345
   }
 }
 ```
 
-Personal skills are editable, but still need origin, timestamps, hashes, and Git history so they are traceable.
+Personal skills are editable, but still need origin, hashes, timestamps/tracking metadata, and Git history so they are traceable.
 
 ## Trust labels
 
 Do not use one generic verification label for all content.
 
-Suggested labels:
+Suggested UI labels:
 
 - `VERIFIED · EXACT UPSTREAM`
 - `PERSONAL`
@@ -123,7 +135,9 @@ Suggested labels:
 
 Only byte-verified commit-pinned upstream content may use `EXACT UPSTREAM`.
 
-The guarantee should remain narrow: provenance and byte identity are guaranteed, not quality, safety, correctness, or freshness of upstream instructions.
+Trust is derived from canonical metadata and verification state. `item.json` must not contain an authored field capable of self-asserting `EXACT UPSTREAM`.
+
+The guarantee remains narrow: provenance and byte identity are guaranteed, not quality, safety, correctness, or freshness of upstream instructions.
 
 ## Translation policy
 
@@ -140,7 +154,9 @@ Translate interface text such as:
 - Delete
 - Update available
 - Settings
-- Verification labels and interface status messages
+- verification/trust labels
+- provenance field labels
+- interface status messages
 
 Do **not** translate:
 
@@ -148,29 +164,33 @@ Do **not** translate:
 - prompt titles
 - `SKILL.md`
 - `PROMPT.md`
-- source-authored descriptions
-- source-authored tags
+- source-authored or owner-authored item descriptions
+- source-authored or owner-authored tags
 - repository names
 - author names
+- source paths
+- commit SHAs
 - provenance values
 
-A prompt called `Research Max` must remain `Research Max` in both English and Slovenian UI. The previous Slovenian title aliases should eventually be removed from the catalog/data model.
+A prompt called `Research Max` remains `Research Max` in both English and Slovenian UI.
 
 ## Catalog generation
 
-Future release: stop maintaining prompt/skill inventory manually in `catalog.json`.
+Implemented in Release A.
 
-Recommended flow:
+The flow is:
 
-1. Scan `skills/**/item.json` and `prompts/**/item.json`.
-2. Validate each item and sibling content file.
-3. Generate `catalog.json` as a build/deploy artifact.
-4. CI fails on invalid or conflicting metadata.
-5. The UI consumes the generated catalog.
+1. Scan canonical `skills/<category>/<slug>/item.json` and `prompts/<category>/<slug>/item.json`.
+2. Validate each item against its filesystem location and sibling content file.
+3. Verify local SHA-256 and byte length.
+4. Reject duplicate IDs and routes.
+5. Derive path and trust projection.
+6. Sort deterministically.
+7. Generate `catalog.json` for the static WebUI.
 
-Result: deleting an item folder from the repository automatically removes it from the generated UI after merge/deploy.
+`catalog.json` is ignored by Git and must never be hand-maintained.
 
-This avoids the current failure mode where a content file can be deleted while a stale catalog card remains.
+Deleting an item folder automatically removes it from the next generated UI after merge/deploy. There is no catalog tombstone or separate inventory record.
 
 ## Prompt workflows
 
@@ -229,7 +249,7 @@ The system should:
 4. preview repository, path, resolved commit, hash, size, and source content;
 5. classify origin;
 6. write exact bytes without transformation;
-7. write provenance metadata separately;
+7. write canonical provenance/integrity metadata separately;
 8. generate catalog data;
 9. create a short-lived branch/PR;
 10. run exact-upstream verification before merge and again before Pages publication.
@@ -245,7 +265,7 @@ Personal skills should:
 - live in the same visual shelf;
 - have `origin.type = "personal"` or another explicit owned origin;
 - have Git-backed history;
-- have content hashes and timestamps;
+- have content hashes and tracking timestamps;
 - be editable through safe workflows;
 - never pretend to be exact upstream content;
 - preserve title/content exactly as authored;
@@ -292,7 +312,7 @@ validate content/provenance
         ↓
 create short-lived branch
         ↓
-write content + metadata
+write content + item.json
         ↓
 generate catalog
         ↓
@@ -350,14 +370,15 @@ Other useful dimensions may include category, author, source repository, tags, d
 
 ## Release sequence recommendation
 
-### Release A — Canonical data model
+### Release A — Canonical data model — implemented
 
-- Introduce `item.json` for prompts and skills.
-- Define origin/provenance schema.
-- Remove translated prompt/skill titles.
-- Translate WebUI chrome only.
-- Generate `catalog.json` from filesystem metadata.
-- Make file deletion automatically remove an item from the UI after regeneration.
+- Introduced `item.json` for prompts and skills.
+- Defined origin/provenance and integrity schema.
+- Removed translated prompt/skill title/description/tag aliases.
+- Limited translation to WebUI chrome.
+- Generated `catalog.json` from filesystem metadata.
+- Made structural item deletion remove catalog entries after regeneration.
+- Preserved exact-upstream byte verification and Pages pre-upload safety gate.
 
 ### Release B — Unified write pipeline
 
@@ -401,7 +422,7 @@ Only if needed later:
 ## Non-negotiable rules
 
 - Never alter a verified exact-upstream `SKILL.md`.
-- Never translate skill or prompt content/titles as part of the Slovenian UI mode.
+- Never translate skill or prompt content/titles/descriptions/tags as part of the Slovenian UI mode.
 - WebUI chrome is the translation boundary.
 - Every skill has explicit origin/provenance.
 - `main` is published trusted state.
@@ -409,7 +430,8 @@ Only if needed later:
 - Do not allow browser clients to write directly to `main`.
 - Do not expose write credentials in client-side code.
 - One mutation pipeline should serve UI, ChatGPT, and CLI entry points.
-- Generated catalog/index files should not become an independent source of truth.
+- Generated catalog/index files must never become an independent source of truth.
+- Upstream updates must never silently overwrite content.
 
 ## Open questions for future design sessions
 
