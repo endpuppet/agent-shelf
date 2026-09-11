@@ -20,6 +20,17 @@ const skillFiles = exists('skills')
 assert.equal(skillEntries.length, 0, 'Cleanup state must contain zero skill catalog entries.');
 assert.equal(skillFiles.length, 0, 'Cleanup state must contain no SKILL.md files.');
 
+const verifyWorkflow = read('.github/workflows/verify.yml');
+const pagesWorkflow = read('.github/workflows/pages.yml');
+assert.ok(exists('.gitattributes'), '.gitattributes must protect imported skill bytes.');
+const gitAttributes = exists('.gitattributes') ? read('.gitattributes') : '';
+assert.match(gitAttributes, /^skills\/\*\*\/SKILL\.md -text$/m, 'Imported SKILL.md files must be marked -text.');
+assert.match(verifyWorkflow, /node tools\/verify-imported-skills\.mjs/, 'Verification workflow must run imported-skill verification.');
+assert.match(pagesWorkflow, /node tools\/verify-imported-skills\.mjs/, 'Pages workflow must run imported-skill verification.');
+const gateIndex = pagesWorkflow.indexOf('node tools/verify-imported-skills.mjs');
+const uploadIndex = pagesWorkflow.indexOf('actions/upload-pages-artifact');
+assert.ok(gateIndex >= 0 && uploadIndex >= 0 && gateIndex < uploadIndex, 'Pages integrity gate must run before artifact upload.');
+
 assert.match(app, /raw\.githubusercontent\.com/, 'Markdown loader needs a raw.githubusercontent.com fallback.');
 assert.match(app, /localStorage/, 'Theme and language choices should persist locally.');
 assert.match(html, /id="language-toggle"/, 'UI needs an EN/SL language control.');

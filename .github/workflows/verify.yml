@@ -16,3 +16,11 @@ jobs:
         uses: actions/checkout@v6
       - name: Run static verification
         run: node tests/verify.mjs
+      - name: Run skill integrity tests
+        run: node tests/skill-integrity.mjs
+      - name: Run importer tests
+        run: node tests/import-skill.mjs
+      - name: Run imported skill verifier tests
+        run: node tests/verify-imported-skills.mjs
+      - name: Verify imported skills against pinned upstream bytes
+        run: node tools/verify-imported-skills.mjs
