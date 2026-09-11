@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "prompt-web-critter-prototype",
+  "type": "prompt",
+  "category": "web-prototypes",
+  "slug": "critter-prototype",
+  "title": "Critter Prototype",
+  "description": "Create a tiny mobile-first world whose critters behave autonomously, react to touch, and recover naturally after interaction.",
+  "tags": [
+    "canvas",
+    "critters",
+    "prototype",
+    "interaction"
+  ],
+  "origin": {
+    "type": "derived",
+    "reference": "test-knowledge-base/prompts/critterproto"
+  },
+  "integrity": {
+    "mode": "content-hash",
+    "sha256": "755e70b44be757f1348104b3c99cb66c987776e835a49a6f8b0e2a88ea74ed9c",
+    "bytes": 1218
+  },
+  "tracking": {}
+}
