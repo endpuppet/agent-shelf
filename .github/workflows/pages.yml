@@ -34,3 +34,19 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Smoke test published Markdown
+        shell: bash
+        run: |
+          base="${{ steps.deployment.outputs.page_url }}"
+          url="${base%/}/skills/svg-vector/svg-authoring/SKILL.md"
+          echo "Checking $url"
+          for attempt in {1..12}; do
+            if body="$(curl --fail --silent --show-error --location --max-time 15 "$url")" && grep -q '^# SVG Authoring' <<<"$body"; then
+              echo "Published Markdown is reachable and intact."
+              exit 0
+            fi
+            echo "Attempt $attempt failed; waiting for Pages propagation..."
+            sleep 5
+          done
+          echo "Published Markdown smoke test failed."
+          exit 1
