@@ -7,11 +7,9 @@
   <meta name="description" content="Agent Shelf — a compact visual browser for reusable agent skills and prompts." />
   <title>Agent Shelf</title>
   <link rel="stylesheet" href="./styles.css" />
-  <link rel="stylesheet" href="./verified-provenance.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
   <script defer src="./app.js"></script>
-  <script defer src="./verified-provenance.js"></script>
 </head>
 <body>
   <div class="ambient ambient-a" aria-hidden="true"></div>
@@ -84,6 +82,18 @@
           <div class="detail-meta-line"><div id="detail-kind" class="detail-kind">skill</div><span class="source-language" data-i18n="source_english">source: EN</span></div>
           <h2 id="detail-title">Item title</h2><p id="detail-description"></p><div id="detail-tags" class="tag-row"></div>
         </header>
+
+        <section id="provenance" class="provenance" aria-label="Item provenance" hidden>
+          <div class="provenance-head">
+            <span id="verification-badge" class="verification-badge"></span>
+            <a id="provenance-source" href="#" target="_blank" rel="noreferrer" hidden></a>
+          </div>
+          <dl class="provenance-grid">
+            <div id="provenance-repository-row"><dt data-i18n="provenance_repository">Repository</dt><dd id="provenance-repository"></dd></div>
+            <div id="provenance-commit-row"><dt data-i18n="provenance_commit">Commit</dt><dd id="provenance-commit"></dd></div>
+            <div id="provenance-hash-row"><dt data-i18n="provenance_fingerprint">Fingerprint</dt><dd id="provenance-hash"></dd></div>
+          </dl>
+        </section>
 
         <div class="action-grid">
           <button id="copy-content" class="button primary" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8zM5 16H4V4h12v1"/></svg><span data-i18n="copy_content">Copy content</span></button>
