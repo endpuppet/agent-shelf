@@ -28,5 +28,7 @@ jobs:
         run: node tests/catalog-builder.mjs
       - name: Generate catalog from canonical metadata
         run: node tools/generate-catalog.mjs
+      - name: Verify catalog is generated output
+        run: node tests/catalog-authority.mjs
       - name: Run static verification against generated catalog
         run: node tests/verify.mjs
