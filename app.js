@@ -29,7 +29,16 @@ const translations = {
     theme_changed: 'Theme changed', language_changed: 'Language changed',
     load_error: 'Could not load this file.', open_source_instead: 'Open the GitHub source instead.',
     item: 'item', items: 'items', skill: 'skill', prompt: 'prompt', all_skills: 'All skills', all_prompts: 'All prompts',
-    switch_language: 'Switch language', choose_theme_label: 'Choose theme', close: 'Close'
+    switch_language: 'Switch language', choose_theme_label: 'Choose theme', close: 'Close',
+    trust_exact_upstream: 'VERIFIED · EXACT UPSTREAM',
+    trust_personal: 'PERSONAL',
+    trust_own_repository: 'OWN REPOSITORY',
+    trust_derived: 'DERIVED',
+    trust_generated: 'GENERATED',
+    provenance_repository: 'Repository',
+    provenance_commit: 'Commit',
+    provenance_fingerprint: 'Fingerprint',
+    pinned_source: 'Pinned source ↗'
   },
   sl: {
     brand_subtitle: 'veščine + pozivi',
@@ -48,7 +57,16 @@ const translations = {
     theme_changed: 'Tema spremenjena', language_changed: 'Jezik spremenjen',
     load_error: 'Datoteke ni bilo mogoče naložiti.', open_source_instead: 'Namesto tega odpri izvor na GitHubu.',
     item: 'element', items: 'elementov', skill: 'veščina', prompt: 'poziv', all_skills: 'Vse veščine', all_prompts: 'Vsi pozivi',
-    switch_language: 'Zamenjaj jezik', choose_theme_label: 'Izberi temo', close: 'Zapri'
+    switch_language: 'Zamenjaj jezik', choose_theme_label: 'Izberi temo', close: 'Zapri',
+    trust_exact_upstream: 'PREVERJENO · IDENTIČNO IZVIRNIKU',
+    trust_personal: 'OSEBNO',
+    trust_own_repository: 'LASTNI REPOZITORIJ',
+    trust_derived: 'IZPELJANO',
+    trust_generated: 'GENERIRANO',
+    provenance_repository: 'Repozitorij',
+    provenance_commit: 'Revizija',
+    provenance_fingerprint: 'Prstni odtis',
+    pinned_source: 'Pripet izvor ↗'
   }
 };
 
@@ -117,7 +135,16 @@ const el = {
   languageBadge: document.querySelector('.language-badge'),
   detailScroll: document.querySelector('.detail-scroll'),
   themeToggle: document.querySelector('#theme-toggle'),
-  themeColor: document.querySelector('meta[name="theme-color"]')
+  themeColor: document.querySelector('meta[name="theme-color"]'),
+  provenance: document.querySelector('#provenance'),
+  verificationBadge: document.querySelector('#verification-badge'),
+  provenanceSource: document.querySelector('#provenance-source'),
+  provenanceRepositoryRow: document.querySelector('#provenance-repository-row'),
+  provenanceRepository: document.querySelector('#provenance-repository'),
+  provenanceCommitRow: document.querySelector('#provenance-commit-row'),
+  provenanceCommit: document.querySelector('#provenance-commit'),
+  provenanceHashRow: document.querySelector('#provenance-hash-row'),
+  provenanceHash: document.querySelector('#provenance-hash')
 };
 
 function t(key) {
@@ -133,15 +160,15 @@ function titleCase(value) {
 }
 
 function itemTitle(item) {
-  return state.language === 'sl' ? (item.title_sl || item.title) : item.title;
+  return item.title;
 }
 
 function itemDescription(item) {
-  return state.language === 'sl' ? (item.description_sl || item.description) : item.description;
+  return item.description;
 }
 
 function itemTags(item) {
-  return state.language === 'sl' ? (item.tags_sl || item.tags || []) : (item.tags || []);
+  return item.tags || [];
 }
 
 function githubUrl(item) {
@@ -150,6 +177,19 @@ function githubUrl(item) {
 
 function rawGithubUrl(item) {
   return `https://raw.githubusercontent.com/endpuppet/agent-shelf/main/${item.path}`;
+}
+
+function pinnedSourceUrl(item) {
+  if (!item || item.trust !== 'exact-upstream' || item.origin?.type !== 'github-upstream') return '';
+  const repository = String(item.origin.repository || '');
+  const commit = String(item.origin.commit || '');
+  const encodedPath = String(item.origin.path || '').split('/').map(encodeURIComponent).join('/');
+  if (!repository || !commit || !encodedPath) return '';
+  return `https://github.com/${repository}/blob/${commit}/${encodedPath}`;
+}
+
+function sourceUrl(item) {
+  return pinnedSourceUrl(item) || githubUrl(item);
 }
 
 function routeFor(item) {
@@ -197,10 +237,9 @@ async function copyText(text, success) {
   toast(success);
 }
 
-function localizedSearchText(item) {
+function searchText(item) {
   return [
-    item.title, item.title_sl, item.description, item.description_sl,
-    item.category, ...(item.tags || []), ...(item.tags_sl || [])
+    item.title, item.description, item.category, titleCase(item.category), ...(item.tags || [])
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
@@ -234,7 +273,7 @@ function filteredItems() {
   return state.catalog.filter((item) => {
     if (item.type !== state.type) return false;
     if (state.category !== 'all' && item.category !== state.category) return false;
-    return !query || localizedSearchText(item).includes(query);
+    return !query || searchText(item).includes(query);
   });
 }
 
@@ -305,7 +344,7 @@ async function loadContent(item) {
     state.content = '';
     el.contentLoading.hidden = true;
     el.preview.hidden = false;
-    el.preview.innerHTML = `<div class="load-error"><strong>${escapeHtml(t('load_error'))}</strong><a href="${githubUrl(item)}" target="_blank" rel="noreferrer">${escapeHtml(t('open_source_instead'))}</a></div>`;
+    el.preview.innerHTML = `<div class="load-error"><strong>${escapeHtml(t('load_error'))}</strong><a href="${sourceUrl(item)}" target="_blank" rel="noreferrer">${escapeHtml(t('open_source_instead'))}</a></div>`;
     console.error(error);
   }
 }
@@ -321,6 +360,49 @@ function setContentView(view) {
   el.raw.hidden = view !== 'raw';
 }
 
+function renderProvenance() {
+  const item = state.selected;
+  if (!item || !item.trust || !el.provenance) {
+    if (el.provenance) el.provenance.hidden = true;
+    return;
+  }
+
+  const trustKey = {
+    'exact-upstream': 'trust_exact_upstream',
+    personal: 'trust_personal',
+    'own-repository': 'trust_own_repository',
+    derived: 'trust_derived',
+    generated: 'trust_generated'
+  }[item.trust];
+  if (!trustKey) {
+    el.provenance.hidden = true;
+    return;
+  }
+
+  el.provenance.hidden = false;
+  el.verificationBadge.textContent = t(trustKey);
+
+  const repository = item.origin?.repository || '';
+  el.provenanceRepositoryRow.hidden = !repository;
+  el.provenanceRepository.textContent = repository;
+
+  const commit = item.origin?.commit || '';
+  el.provenanceCommitRow.hidden = !commit;
+  el.provenanceCommit.textContent = commit ? commit.slice(0, 7) : '';
+  el.provenanceCommit.title = commit;
+
+  const fingerprint = item.integrity?.sha256 || '';
+  el.provenanceHashRow.hidden = !fingerprint;
+  el.provenanceHash.textContent = fingerprint ? `sha256:${fingerprint.slice(0, 12)}…` : '';
+  el.provenanceHash.title = fingerprint ? `sha256:${fingerprint}` : '';
+
+  const exact = item.trust === 'exact-upstream' && item.origin?.type === 'github-upstream';
+  const pinned = exact ? pinnedSourceUrl(item) : '';
+  el.provenanceSource.hidden = !pinned;
+  el.provenanceSource.href = pinned || '#';
+  el.provenanceSource.textContent = t('pinned_source');
+}
+
 function renderDetailMeta() {
   const item = state.selected;
   if (!item) return;
@@ -330,6 +412,7 @@ function renderDetailMeta() {
   el.detailTitle.textContent = itemTitle(item);
   el.detailDescription.textContent = itemDescription(item);
   el.detailTags.innerHTML = itemTags(item).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+  renderProvenance();
 }
 
 function openItem(item, {updateHash = true} = {}) {
@@ -338,7 +421,7 @@ function openItem(item, {updateHash = true} = {}) {
   state.content = '';
   state.view = 'preview';
   renderDetailMeta();
-  const source = githubUrl(item);
+  const source = sourceUrl(item);
   el.detailGithubTop.href = source;
   el.openGithub.href = source;
   el.detail.classList.add('is-open');
@@ -398,6 +481,7 @@ function cycleTheme() {
   const nextTheme = THEMES[(currentIndex + 1) % THEMES.length];
   applyTheme(nextTheme, {notify: true});
 }
+
 function applyLanguage({notify = false} = {}) {
   document.documentElement.lang = state.language;
   localStorage.setItem(STORAGE.language, state.language);
@@ -461,7 +545,7 @@ document.querySelectorAll('[data-close-detail]').forEach((button) => button.addE
 document.querySelectorAll('.content-tab').forEach((tab) => tab.addEventListener('click', () => setContentView(tab.dataset.view)));
 el.copyContent.addEventListener('click', () => state.selected && copyText(state.content, t('content_copied')));
 el.copyAppLink.addEventListener('click', () => state.selected && copyText(appUrl(state.selected), t('shelf_link_copied')));
-el.copySourceLink.addEventListener('click', () => state.selected && copyText(githubUrl(state.selected), t('source_link_copied')));
+el.copySourceLink.addEventListener('click', () => state.selected && copyText(sourceUrl(state.selected), t('source_link_copied')));
 
 el.languageToggle.addEventListener('click', () => {
   state.language = state.language === 'en' ? 'sl' : 'en';

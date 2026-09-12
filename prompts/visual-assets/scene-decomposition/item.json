@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "prompt-assets-scene-decomposition",
+  "type": "prompt",
+  "category": "visual-assets",
+  "slug": "scene-decomposition",
+  "title": "Scene Decomposition",
+  "description": "Analyze a flattened scene and plan a compact set of clean, reusable layers for interactive 2D/2.5D or WebGPU reconstruction.",
+  "tags": [
+    "assets",
+    "layers",
+    "2.5d",
+    "webgpu"
+  ],
+  "origin": {
+    "type": "derived",
+    "reference": "Popackani / ENDNODE scene-separation workflow"
+  },
+  "integrity": {
+    "mode": "content-hash",
+    "sha256": "f13db7935c877d9c1a2d516fa5a481d915faa060b1c5adfe827c65a880b2431f",
+    "bytes": 1510
+  },
+  "tracking": {}
+}

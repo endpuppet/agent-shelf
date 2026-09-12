@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "prompt-web-svg-world",
+  "type": "prompt",
+  "category": "web-prototypes",
+  "slug": "svg-world",
+  "title": "SVG World",
+  "description": "Build a mobile-first single-file interactive world authored from inline SVG with constrained skill routing and an implementation audit.",
+  "tags": [
+    "svg",
+    "prototype",
+    "mobile-first",
+    "interactive"
+  ],
+  "origin": {
+    "type": "derived",
+    "reference": "test-knowledge-base/prompts/svgworld"
+  },
+  "integrity": {
+    "mode": "content-hash",
+    "sha256": "505ae6c4d5315975e571f3e3e8e143098f22d3bd1258fece4759042f93786290",
+    "bytes": 1218
+  },
+  "tracking": {}
+}

@@ -6,64 +6,58 @@ import { sha256 } from '../lib/skill-integrity.mjs';
 import { verifyImportedSkills } from '../tools/verify-imported-skills.mjs';
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
+const OTHER_COMMIT = 'f'.repeat(40);
 const original = Buffer.from('# Exact Skill\r\nBody\r\n', 'utf8');
 const upstreamMutated = Buffer.from('# Exact Skill\nBody\n', 'utf8');
-const metadataFor = (bytes = original) => ({
+const itemFor = (bytes = original) => ({
   schema_version: 1,
-  kind: 'verified-upstream-skill',
-  source: { repository: 'owner/repo', path: 'SKILL.md', commit: COMMIT },
-  integrity: { sha256: sha256(bytes), bytes: bytes.length },
-  imported_at: '2026-09-11T13:00:00.000Z'
+  id: 'skill-frontend-exact-skill',
+  type: 'skill',
+  category: 'frontend',
+  slug: 'exact-skill',
+  title: 'Exact Skill',
+  description: 'Exact upstream fixture.',
+  tags: [],
+  origin: { type: 'github-upstream', repository: 'owner/repo', path: 'SKILL.md', commit: COMMIT },
+  integrity: { mode: 'exact-upstream', sha256: sha256(bytes), bytes: bytes.length },
+  tracking: { imported_at: '2026-09-11T13:00:00.000Z' }
 });
 
-function makeRoot({skillBytes = original, metadata = metadataFor(), catalogItems = [], writeSkill = true} = {}) {
+function makeRoot({skillBytes = original, item = itemFor(), writeSkill = true, writeItem = true} = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-shelf-verify-'));
-  fs.writeFileSync(path.join(root, 'catalog.json'), JSON.stringify({version:1, items:catalogItems}));
   const dir = path.join(root, 'skills/frontend/exact-skill');
   fs.mkdirSync(dir, {recursive:true});
-  fs.writeFileSync(path.join(dir, 'agent-shelf.json'), JSON.stringify(metadata));
+  if (writeItem) fs.writeFileSync(path.join(dir, 'item.json'), JSON.stringify(item));
   if (writeSkill) fs.writeFileSync(path.join(dir, 'SKILL.md'), skillBytes);
   return root;
 }
 
-const fetchBytes = (bytes) => async () => ({
+const responseFor = (bytes) => ({
   ok: true,
   status: 200,
   arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
 });
+const fetchBytes = (bytes) => async () => responseFor(bytes);
+const fetchByCommit = async (url) => responseFor(url.includes(OTHER_COMMIT) ? upstreamMutated : original);
 
 {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-shelf-zero-'));
-  fs.writeFileSync(path.join(root, 'catalog.json'), JSON.stringify({version:1, items:[]}));
   const logs=[];
   assert.equal(await verifyImportedSkills({rootDir:root, fetchImpl:fetchBytes(original), log:(m)=>logs.push(m)}), 0);
   assert.deepEqual(logs, ['Verified 0 imported skills.']);
 }
 
 await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot({writeSkill:false}), fetchImpl:fetchBytes(original)}), /missing sibling SKILL\.md/i);
+await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot({writeItem:false}), fetchImpl:fetchBytes(original)}), /orphan|item\.json/i);
 await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot({skillBytes:Buffer.from('# Changed\n')}), fetchImpl:fetchBytes(original)}), /byte length|hash|identity/i);
 await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot(), fetchImpl:fetchBytes(upstreamMutated)}), /byte length|hash|identity/i);
 
-const goodCatalog = {
-  id:'skill-frontend-exact-skill', type:'skill', category:'frontend', slug:'exact-skill',
-  title:'Exact Skill', title_sl:'Točna veščina', description:'Exact', description_sl:'Točno', tags:[], tags_sl:[],
-  path:'skills/frontend/exact-skill/SKILL.md', verification:'exact-upstream',
-  source_repository:'owner/repo', source_path:'SKILL.md', source_commit:COMMIT, sha256:sha256(original)
-};
-await assert.rejects(() => verifyImportedSkills({
-  rootDir:makeRoot({catalogItems:[{...goodCatalog, path:'skills/frontend/exact-skill/OTHER.md'}]}),
-  fetchImpl:fetchBytes(original)
-}), /catalog path mismatch/i);
-await assert.rejects(() => verifyImportedSkills({
-  rootDir:makeRoot({catalogItems:[{...goodCatalog, verification:'something-else'}]}),
-  fetchImpl:fetchBytes(original)
-}), /exact-upstream/i);
+{
+  const item = itemFor();
+  item.origin.commit = OTHER_COMMIT;
+  await assert.rejects(() => verifyImportedSkills({rootDir:makeRoot({item}), fetchImpl:fetchByCommit}), /upstream|hash|identity|byte length/i);
+}
 
-await assert.rejects(() => verifyImportedSkills({
-  rootDir:makeRoot({catalogItems:[{...goodCatalog, source_commit:'f'.repeat(40)}]}),
-  fetchImpl:fetchBytes(original)
-}), /provenance mismatch/i);
-
-assert.equal(await verifyImportedSkills({rootDir:makeRoot({catalogItems:[goodCatalog]}), fetchImpl:fetchBytes(original), log:()=>{}}), 1);
+assert.equal(await verifyImportedSkills({rootDir:makeRoot(), fetchImpl:fetchBytes(original), log:()=>{}}), 1);
 
 console.log('Imported skill verifier tests passed.');

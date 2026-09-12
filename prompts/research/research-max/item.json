@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "prompt-research-research-max",
+  "type": "prompt",
+  "category": "research",
+  "slug": "research-max",
+  "title": "Research Max",
+  "description": "Evidence-first research orchestration with depth levels, modifiers, source verification, and practical synthesis.",
+  "tags": [
+    "research",
+    "verification",
+    "tools",
+    "sources"
+  ],
+  "origin": {
+    "type": "derived",
+    "reference": "test-knowledge-base/prompts/research"
+  },
+  "integrity": {
+    "mode": "content-hash",
+    "sha256": "7791d0dc505b26cd080fa8e978d0663847b611a7f4e4974240469f7118786d9e",
+    "bytes": 2094
+  },
+  "tracking": {}
+}
